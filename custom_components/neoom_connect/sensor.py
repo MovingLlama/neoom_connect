@@ -13,7 +13,7 @@ from homeassistant.const import (
     UnitOfFrequency,
     UnitOfTime
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
@@ -27,7 +27,6 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
     entities = []
 
     # --- CLOUD SENSOREN ---
-    # Statische Sensoren für Cloud-Daten
     entities.append(NeoomCloudSensor(
         cloud_coordinator, "electricity_price", "Electricity Price", "EUR/kWh", "mdi:currency-eur"
     ))
@@ -36,7 +35,6 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
     ))
 
     # --- LOKALE SENSOREN (Dynamisch) ---
-    # Versuche die Konfiguration zu laden (kann beim Start leer sein, wenn offline)
     beaam_config = local_coordinator.data.get("config", {}) if local_coordinator.data else {}
     
     if beaam_config:
@@ -51,11 +49,10 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
             for dp_id, dp_data in datapoints.items():
                 if not dp_data: continue
 
-                # Wir erstellen Sensoren nur für numerische Typen
                 dtype = dp_data.get("dataType")
                 
-                # Check dataType (manchmal Arrays, wir nehmen vorerst einfache NUMBER)
-                if dtype == "NUMBER":
+                # Wir erlauben jetzt auch STRING (z.B. für PHASE_SWITCHING_MODE)
+                if dtype in ["NUMBER", "STRING"]:
                     entities.append(NeoomLocalSensor(
                         local_coordinator, 
                         thing_id, 
@@ -76,7 +73,6 @@ class NeoomCloudSensor(CoordinatorEntity, SensorEntity):
         self._name = name
         self._unit = unit
         self._icon = icon
-        # Eindeutige ID basierend auf Site-ID und Schlüssel
         self._attr_unique_id = f"{coordinator.site_id}_{key}"
 
     @property
@@ -85,7 +81,6 @@ class NeoomCloudSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def state(self):
-        """Gibt den aktuellen Wert aus den Koordinator-Daten zurück."""
         if not self.coordinator.data: return None
         return self.coordinator.data.get("site", {}).get(self._key)
 
@@ -99,7 +94,6 @@ class NeoomCloudSensor(CoordinatorEntity, SensorEntity):
     
     @property
     def device_info(self):
-        """Verknüpft den Sensor mit dem Cloud-Dienst Device."""
         return DeviceInfo(
             identifiers={(DOMAIN, self.coordinator.site_id)},
             name="Ntuity Cloud Site",
@@ -119,32 +113,65 @@ class NeoomLocalSensor(CoordinatorEntity, SensorEntity):
         self._key = dp_data.get("key")
         self._uom_raw = dp_data.get("unitOfMeasure")
         
-        # Erstelle lesbare Namen (z.B. aus "INVERTER" wird "Inverter")
         friendly_thing_name = self._thing_type.replace("_", " ").title()
         friendly_dp_name = self._key.replace("_", " ").title()
         self._attr_name = f"{friendly_thing_name} {friendly_dp_name}"
         self._attr_unique_id = f"{thing_id}_{dp_id}"
 
-        # Mappe Einheiten und Device Classes für Home Assistant
-        self._attr_native_unit_of_measurement = self._map_unit(self._uom_raw)
         self._attr_device_class = self._map_device_class(self._key, self._uom_raw)
         self._attr_state_class = self._map_state_class(self._key)
-
-    @property
-    def native_value(self):
-        """Holt den Wert aus der zusammengeführten State-Map."""
-        if not self.coordinator.data: return None
         
+        self._update_state_and_unit()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Wird aufgerufen, wenn neue Daten vom Coordinator kommen."""
+        self._update_state_and_unit()
+        super()._handle_coordinator_update()
+
+    def _update_state_and_unit(self):
+        """Berechnet Wert und Einheit."""
+        if not self.coordinator.data:
+            self._attr_native_value = None
+            self._attr_native_unit_of_measurement = self._map_unit(self._uom_raw)
+            return
+
         state_map = self.coordinator.data.get("states", {})
         data_point = state_map.get(self._dp_id)
         
         if data_point:
-            return data_point.get("value")
-        return None
+            raw_value = data_point.get("value")
+            
+            # Smart Scaling nur für Zahlen
+            if raw_value is not None and isinstance(raw_value, (int, float)):
+                scaled_val, scaled_unit_str = self._smart_scale(float(raw_value), self._uom_raw)
+                self._attr_native_value = scaled_val
+                self._attr_native_unit_of_measurement = self._map_unit(scaled_unit_str)
+            else:
+                # Strings (z.B. Mode) einfach durchreichen
+                self._attr_native_value = raw_value
+                # Bei Strings ist unit oft "None", wir mappen das zu None (leer)
+                self._attr_native_unit_of_measurement = self._map_unit(self._uom_raw)
+        else:
+            self._attr_native_value = None
+
+    def _smart_scale(self, value, unit):
+        """Skaliert Werte automatisch in k, M, G Einheiten."""
+        if unit not in ["W", "Wh"]:
+            return value, unit
+            
+        abs_value = abs(value)
+        if abs_value >= 1_000_000_000:
+            return round(value / 1_000_000_000, 2), "G" + unit
+        elif abs_value >= 1_000_000:
+            return round(value / 1_000_000, 2), "M" + unit
+        elif abs_value >= 1_000:
+            return round(value / 1_000, 2), "k" + unit
+        
+        return round(value, 2), unit
 
     @property
     def device_info(self):
-        """Verknüpft den Sensor mit dem physischen Gerät (z.B. Wechselrichter)."""
         return DeviceInfo(
             identifiers={(DOMAIN, self._thing_id)},
             name=f"neoom {self._thing_type}",
@@ -153,28 +180,43 @@ class NeoomLocalSensor(CoordinatorEntity, SensorEntity):
             via_device=(DOMAIN, "BEAAM Gateway")
         )
 
-    def _map_unit(self, raw_unit):
-        """Konvertiert API-Einheiten in HA-Konstanten."""
-        if raw_unit == "W": return UnitOfPower.WATT
-        if raw_unit == "Wh": return UnitOfEnergy.WATT_HOUR
-        if raw_unit == "V": return UnitOfElectricPotential.VOLT
-        if raw_unit == "A": return UnitOfElectricCurrent.AMPERE
-        if raw_unit == "%": return PERCENTAGE
-        if raw_unit == "Hz": return UnitOfFrequency.HERTZ
-        if raw_unit == "s": return UnitOfTime.SECONDS
-        return None
+    def _map_unit(self, unit_str):
+        # Wenn Einheit "None" ist (bei Strings üblich), geben wir None zurück (keine Einheit in UI)
+        if unit_str == "None": return None
+        
+        # Power
+        if unit_str == "W": return UnitOfPower.WATT
+        if unit_str == "kW": return UnitOfPower.KILO_WATT
+        if unit_str == "MW": return UnitOfPower.MEGA_WATT
+        if unit_str == "GW": return UnitOfPower.GIGA_WATT
+        
+        # Energy
+        if unit_str == "Wh": return UnitOfEnergy.WATT_HOUR
+        if unit_str == "kWh": return UnitOfEnergy.KILO_WATT_HOUR
+        if unit_str == "MWh": return UnitOfEnergy.MEGA_WATT_HOUR
+        if unit_str == "GWh": return UnitOfEnergy.GIGA_WATT_HOUR
+        
+        # Others
+        if unit_str == "V": return UnitOfElectricPotential.VOLT
+        if unit_str == "A": return UnitOfElectricCurrent.AMPERE
+        if unit_str == "%": return PERCENTAGE
+        if unit_str == "Hz": return UnitOfFrequency.HERTZ
+        if unit_str == "s": return UnitOfTime.SECONDS
+        
+        return unit_str
 
     def _map_device_class(self, key, unit):
-        """Bestimmt die Klasse des Sensors (für Icons und Darstellung)."""
-        if unit == "W": return SensorDeviceClass.POWER
-        if unit == "Wh": return SensorDeviceClass.ENERGY
+        if unit in ["W", "kW", "MW", "GW"]: return SensorDeviceClass.POWER
+        if unit in ["Wh", "kWh", "MWh", "GWh"]: return SensorDeviceClass.ENERGY
         if unit == "V": return SensorDeviceClass.VOLTAGE
         if unit == "A": return SensorDeviceClass.CURRENT
         if unit == "%" and "SOC" in key: return SensorDeviceClass.BATTERY
         return None
 
     def _map_state_class(self, key):
-        """Bestimmt, wie Statistiken aufgezeichnet werden."""
         if "ENERGY" in key:
             return SensorStateClass.TOTAL_INCREASING
+        # Keine State Class für Strings (Modes)
+        if isinstance(self._uom_raw, str) and self._uom_raw == "None":
+            return None
         return SensorStateClass.MEASUREMENT

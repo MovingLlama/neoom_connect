@@ -10,6 +10,11 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, LOGGER
 
+# Diese Schlüssel werden ignoriert, auch wenn die API sie als "controllable" markiert.
+# MIN_SOC: Wird oft vom BMS fest vorgegeben.
+# MAX_POWER_CHARGE_FALLBACK: Wird meist intern geregelt.
+IGNORE_KEYS = ["MIN_SOC", "MAX_POWER_CHARGE_FALLBACK"]
+
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
     """Richtet die Number-Plattform ein."""
     data = hass.data[DOMAIN][entry.entry_id]
@@ -35,8 +40,10 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
                 # Suche nach steuerbaren numerischen Werten ("controllable": true)
                 dtype = dp_data.get("dataType")
                 controllable = dp_data.get("controllable", False)
+                key = dp_data.get("key")
                 
-                if dtype == "NUMBER" and controllable:
+                # Wir filtern hier explizit Schlüssel heraus, die nicht geändert werden sollen
+                if dtype == "NUMBER" and controllable and key not in IGNORE_KEYS:
                     entities.append(NeoomLocalNumber(
                         local_coordinator, 
                         thing_id, 
@@ -74,8 +81,7 @@ class NeoomLocalNumber(CoordinatorEntity, NumberEntity):
         elif self._uom_raw == "W":
             self._attr_native_unit_of_measurement = UnitOfPower.WATT
             self._attr_device_class = NumberDeviceClass.POWER
-            # Dynamische Bereiche wären besser, aber wir setzen sichere Standardwerte basierend auf typischen Systemgrößen
-            # Max Speicherleistung ~15kW, Max Netz ~11kW (laut Beispiel-JSON)
+            # Standardwerte für Leistung
             self._attr_native_min_value = -20000 
             self._attr_native_max_value = 20000
             self._attr_native_step = 100
