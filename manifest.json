@@ -1,0 +1,11 @@
+{
+  "domain": "neoom_connect",
+  "name": "Neoom Connect",
+  "codeowners": ["@MovingLlama"],
+  "config_flow": true,
+  "documentation": "https://github.com/MovingLlama/neoom_connect",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/MovingLlama/neoom_connect/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}
