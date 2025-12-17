@@ -27,7 +27,6 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
     entities = []
 
     # --- CLOUD SENSORS ---
-    # Example: Electricity Price
     entities.append(NeoomCloudSensor(
         cloud_coordinator, "electricity_price", "Electricity Price", "EUR/kWh", "mdi:currency-eur"
     ))
@@ -36,23 +35,25 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
     ))
 
     # --- LOCAL SENSORS (Dynamic) ---
-    # We iterate through the 'things' in the configuration to create devices and sensors
-    beaam_config = local_coordinator.data.get("config", {})
+    # Try to get config, might be empty if first update failed
+    beaam_config = local_coordinator.data.get("config", {}) if local_coordinator.data else {}
     
     if beaam_config:
         things = beaam_config.get("things", {})
         
         for thing_id, thing_data in things.items():
+            if not thing_data: continue
+
             thing_type = thing_data.get("type")
             datapoints = thing_data.get("dataPoints", {})
 
             for dp_id, dp_data in datapoints.items():
-                # We only create sensors for numeric types generally
-                # dataType: NUMBER, STRING, BOOLEAN
+                if not dp_data: continue
+
+                # Create sensors for numeric types
                 dtype = dp_data.get("dataType")
-                key = dp_data.get("key")
                 
-                # Filter useful sensors
+                # Check dataType, some arrays might need special handling, for now we take simple NUMBER
                 if dtype == "NUMBER":
                     entities.append(NeoomLocalSensor(
                         local_coordinator, 
@@ -78,11 +79,11 @@ class NeoomCloudSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def name(self):
-        return f"Neoom Cloud {self._name}"
+        return f"neoom Cloud {self._name}"
 
     @property
     def state(self):
-        # Data is in coordinator.data["site"]
+        if not self.coordinator.data: return None
         return self.coordinator.data.get("site", {}).get(self._key)
 
     @property
@@ -98,7 +99,7 @@ class NeoomCloudSensor(CoordinatorEntity, SensorEntity):
         return DeviceInfo(
             identifiers={(DOMAIN, self.coordinator.site_id)},
             name="Ntuity Cloud Site",
-            manufacturer="Neoom",
+            manufacturer="neoom",
             model="Cloud API",
         )
 
@@ -114,21 +115,20 @@ class NeoomLocalSensor(CoordinatorEntity, SensorEntity):
         self._key = dp_data.get("key")
         self._uom_raw = dp_data.get("unitOfMeasure")
         
-        # Determine readable name
-        # E.g., Inverter Active Power
         friendly_thing_name = self._thing_type.replace("_", " ").title()
         friendly_dp_name = self._key.replace("_", " ").title()
         self._attr_name = f"{friendly_thing_name} {friendly_dp_name}"
         self._attr_unique_id = f"{thing_id}_{dp_id}"
 
-        # Map Units to HA Constants
         self._attr_native_unit_of_measurement = self._map_unit(self._uom_raw)
         self._attr_device_class = self._map_device_class(self._key, self._uom_raw)
         self._attr_state_class = self._map_state_class(self._key)
 
     @property
     def native_value(self):
-        # Look up value in the state map using dp_id
+        if not self.coordinator.data: return None
+        
+        # Look up in the merged state map
         state_map = self.coordinator.data.get("states", {})
         data_point = state_map.get(self._dp_id)
         
@@ -141,8 +141,8 @@ class NeoomLocalSensor(CoordinatorEntity, SensorEntity):
         """Link this sensor to a device (e.g., the specific Inverter)."""
         return DeviceInfo(
             identifiers={(DOMAIN, self._thing_id)},
-            name=f"Neoom {self._thing_type}",
-            manufacturer="Neoom",
+            name=f"neoom {self._thing_type}",
+            manufacturer="neoom",
             model=self._thing_type,
             via_device=(DOMAIN, "BEAAM Gateway")
         )

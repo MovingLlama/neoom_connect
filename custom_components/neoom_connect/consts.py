@@ -5,7 +5,7 @@ from logging import Logger, getLogger
 LOGGER: Logger = getLogger(__package__)
 
 DOMAIN = "neoom_connect"
-NAME = "Neoom Connect"
+NAME = "neoom Connect"
 
 # Configuration Keys
 CONF_SITE_ID = "site_id"

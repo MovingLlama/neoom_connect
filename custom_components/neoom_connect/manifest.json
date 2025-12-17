@@ -1,6 +1,6 @@
 {
   "domain": "neoom_connect",
-  "name": "Neoom Connect",
+  "name": "neoom Connect",
   "codeowners": ["@MovingLlama"],
   "config_flow": true,
   "documentation": "https://github.com/MovingLlama/neoom_connect",

@@ -1,10 +1,12 @@
-Neoom Connect für Home Assistant
+<img src="https://neoom.com/hubfs/01_neoom%20Website%20neu/Icons/Icon_Systemicons/neoom_round_c.svg" width="60" height="60" align="center" alt="neoom Logo"> neoom Connect
 
-Eine Hybrid-Integration für Neoom Systeme (Kjuube, Beaam, etc.), die das Beste aus zwei Welten verbindet:
+Eine Hybrid-Integration für neoom Systeme (Kjuube, Beaam, etc.), die das Beste aus zwei Welten verbindet:
 
 Ntuity Cloud: Für Tarifdaten, Wettervorhersagen und statistische Werte.
 
 Lokales BEAAM Gateway: Für Echtzeit-Daten (Sekundentakt) ohne Cloud-Verzögerung.
+
+<img src="https://neoom.com/hubfs/01_neoom%20Website%20neu/Icons/Icon_Systemicons/neoom_round_c.svg" width="100" align="right">
 
 Funktionen
 
@@ -42,7 +44,7 @@ Wähle als Kategorie Integration.
 
 Klicke auf "Hinzufügen" und installiere die Integration.
 
-Starte Home Assistant neu.
+WICHTIG: Starte Home Assistant komplett neu (Einstellungen -> System -> Neu starten).
 
 Konfiguration
 
@@ -50,7 +52,7 @@ Gehe zu Einstellungen -> Geräte & Dienste.
 
 Klicke auf Integration hinzufügen.
 
-Suche nach Neoom Connect.
+Suche nach neoom Connect.
 
 Gib die erforderlichen Daten (Token, IDs, IP) in das Formular ein.
 
@@ -84,6 +86,16 @@ Status (Verbunden/Lädt), Aktuelle Leistung, Geladene Energie
 
 Fehlerbehebung
 
+Fehler: "Invalid handler specified"
+
+Dies passiert, wenn Home Assistant die Integrationsdateien noch nicht vollständig geladen hat.
+
+Prüfe, ob der Ordner unter /config/custom_components/ exakt neoom_connect heißt.
+
+Starte Home Assistant neu.
+
+Keine Daten
+
 Sollten keine Daten ankommen:
 
 Prüfe, ob das BEAAM Gateway unter der angegebenen IP erreichbar ist.
@@ -98,4 +110,4 @@ logger:
     custom_components.neoom_connect: debug
 
 
-Disclaimer: Dies ist keine offizielle Integration von Neoom.
+Disclaimer: Dies ist keine offizielle Integration von neoom.

@@ -1,6 +1,7 @@
 """DataUpdateCoordinators for Neoom Connect."""
 import aiohttp
 import async_timeout
+import asyncio
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
@@ -78,7 +79,7 @@ class NeoomLocalCoordinator(DataUpdateCoordinator):
         self.ip = ip
         self.key = key
         self.session = aiohttp.ClientSession()
-        # We store the configuration (metadata) separately so we don't fetch it every poll
+        # We store the configuration (metadata) separately
         self.beaam_config = None 
 
     async def _ensure_config_loaded(self):
@@ -87,8 +88,6 @@ class NeoomLocalCoordinator(DataUpdateCoordinator):
             return
 
         url = f"http://{self.ip}/api/v1/site/configuration"
-        # Assuming Bearer token for local API as well, or just passed. 
-        # Adjust header if BEAAM uses a specific custom header.
         headers = {"Authorization": f"Bearer {self.key}"} 
         
         try:
@@ -102,32 +101,60 @@ class NeoomLocalCoordinator(DataUpdateCoordinator):
         except Exception as err:
              raise UpdateFailed(f"Could not load BEAAM configuration: {err}")
 
+    async def _fetch_thing_state(self, thing_id, headers):
+        """Helper to fetch state for a single thing (safe against partial failures)."""
+        url = f"http://{self.ip}/api/v1/things/{thing_id}/states"
+        try:
+            # We use a short timeout for individual things so one slow device doesn't block everything
+            async with self.session.get(url, headers=headers, timeout=5) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+        except Exception:
+            # Log debug but don't fail the whole update if one thing is offline
+            LOGGER.debug(f"Could not fetch state for thing {thing_id}")
+        return None
+
     async def _async_update_data(self):
-        """Fetch real-time state from BEAAM."""
+        """Fetch real-time state from BEAAM (Site + All Things)."""
         await self._ensure_config_loaded()
 
+        headers = {"Authorization": f"Bearer {self.key}"}
+        state_map = {}
+
         try:
-            async with async_timeout.timeout(5):
-                url = f"http://{self.ip}/api/v1/site/state"
-                headers = {"Authorization": f"Bearer {self.key}"}
+            async with async_timeout.timeout(20): # Increased timeout for multiple requests
                 
-                async with self.session.get(url, headers=headers) as resp:
+                # 1. Fetch Global Site State
+                url_site = f"http://{self.ip}/api/v1/site/state"
+                async with self.session.get(url_site, headers=headers) as resp:
                     if resp.status == 401:
                         raise ConfigEntryAuthFailed("Local API Key Invalid")
                     resp.raise_for_status()
-                    data = await resp.json()
+                    site_data = await resp.json()
                     
-                    # Transform list of states into a dict keyed by DataPoint ID for easy lookup O(1)
-                    # The API returns { "energyFlow": { "states": [ ... ] } }
-                    state_map = {}
-                    if "energyFlow" in data and "states" in data["energyFlow"]:
-                        for item in data["energyFlow"]["states"]:
+                    # Map Site Data
+                    if "energyFlow" in site_data and "states" in site_data["energyFlow"]:
+                        for item in site_data["energyFlow"]["states"]:
                             state_map[item["dataPointId"]] = item
+
+                # 2. Fetch Individual Things States (Parallel)
+                if self.beaam_config and "things" in self.beaam_config:
+                    tasks = []
+                    for thing_id in self.beaam_config["things"]:
+                        tasks.append(self._fetch_thing_state(thing_id, headers))
                     
-                    return {
-                        "config": self.beaam_config,
-                        "states": state_map
-                    }
+                    if tasks:
+                        results = await asyncio.gather(*tasks)
+                        for res in results:
+                            if res and "states" in res:
+                                for item in res["states"]:
+                                    # Merge into the main map
+                                    state_map[item["dataPointId"]] = item
+
+                return {
+                    "config": self.beaam_config,
+                    "states": state_map
+                }
 
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Error communicating with BEAAM: {err}")

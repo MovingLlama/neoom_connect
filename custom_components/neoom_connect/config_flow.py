@@ -21,8 +21,8 @@ class NeoomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 # Hier könnten wir noch die Verbindung testen, bevor wir speichern.
                 # Fürs erste speichern wir direkt, um Installationsprobleme zu vermeiden.
-                _LOGGER.info("Creating Neoom Connect entry for site %s", user_input[CONF_SITE_ID])
-                return self.async_create_entry(title="Neoom System", data=user_input)
+                _LOGGER.info("Creating neoom Connect entry for site %s", user_input[CONF_SITE_ID])
+                return self.async_create_entry(title="neoom System", data=user_input)
             except Exception:
                 _LOGGER.exception("Unexpected exception during config flow")
                 errors["base"] = "unknown"

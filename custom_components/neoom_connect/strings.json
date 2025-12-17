@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Neoom Connect Setup",
+        "title": "neoom Connect Setup",
         "description": "Bitte gib deine Ntuity und BEAAM Daten ein.",
         "data": {
           "cloud_token": "Ntuity Bearer Token",
