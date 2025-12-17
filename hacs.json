@@ -1,0 +1,9 @@
+{
+  "name": "Neoom Connect",
+  "render_readme": true,
+  "content_in_root": false,
+  "filename": "neoom_connect.zip",
+  "homeassistant": "2024.1.0",
+  "country": "AT",
+  "iot_class": "local_polling"
+}
