@@ -20,4 +20,4 @@ LOCAL_API_PORT = 80 # Standard HTTP Port für das BEAAM Gateway
 
 # Standard Aktualisierungsintervalle
 DEFAULT_SCAN_INTERVAL_CLOUD = 300  # Alle 5 Minuten (Cloud-Daten ändern sich selten)
-DEFAULT_SCAN_INTERVAL_LOCAL = 30   # Alle 30 Sekunden (für Live-Werte vom Gateway)
+DEFAULT_SCAN_INTERVAL_LOCAL = 15   # Alle 15 Sekunden (für Live-Werte vom Gateway)
