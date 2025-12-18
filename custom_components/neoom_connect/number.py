@@ -13,7 +13,8 @@ from .const import DOMAIN, LOGGER
 # Diese Schlüssel werden ignoriert, auch wenn die API sie als "controllable" markiert.
 # MIN_SOC: Wird oft vom BMS fest vorgegeben.
 # MAX_POWER_CHARGE_FALLBACK: Wird meist intern geregelt.
-IGNORE_KEYS = ["MIN_SOC", "MAX_POWER_CHARGE_FALLBACK"]
+# TARGET_POWER: Direktes Laden/Entladen erzwingen ist oft nicht erwünscht oder gefährlich.
+IGNORE_KEYS = ["MIN_SOC", "MAX_POWER_CHARGE_FALLBACK", "TARGET_POWER"]
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
     """Richtet die Number-Plattform ein."""
