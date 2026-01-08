@@ -2,6 +2,7 @@
 import asyncio
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr  # <-- NEU: Import für Device Registry
 
 from .const import DOMAIN, CONF_CLOUD_TOKEN, CONF_SITE_ID, CONF_BEAAM_IP, CONF_BEAAM_KEY
 from .coordinator import NeoomCloudCoordinator, NeoomLocalCoordinator
@@ -39,6 +40,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "cloud": cloud_coordinator,
         "local": local_coordinator
     }
+
+    # --- FIX START: Gateway Device explizit registrieren ---
+    # Wir müssen das BEAAM Gateway im Device Registry anlegen, bevor die Sensoren
+    # darauf verweisen können ('via_device'), um den Fehler zu vermeiden.
+    device_registry = dr.async_get(hass)
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, "BEAAM Gateway")},
+        manufacturer="neoom",
+        name="BEAAM Gateway",
+        model="BEAAM",
+        configuration_url=f"http://{entry.data[CONF_BEAAM_IP]}"
+    )
+    # --- FIX END ---
 
     # Lade alle Plattformen (jetzt auch Select)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
