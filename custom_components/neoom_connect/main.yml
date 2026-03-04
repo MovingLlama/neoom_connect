@@ -22,7 +22,7 @@ jobs:
         run: |
           # --- KONFIGURATION ---
           # Hier auf die neue Minor Version stellen (z.B. 0.2)
-          MAJOR_MINOR="0.1" 
+          MAJOR_MINOR="0.9" 
           OFFSET=1
           
           # --- BERECHNUNG ---
