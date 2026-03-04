@@ -1,23 +1,50 @@
-"""Konstanten für neoom Connect."""
+"""Konstanten für die neoom Connect Integration."""
 
 from logging import Logger, getLogger
 
-# Logger Initialisierung für Debug-Zwecke
+# Zentraler Logger für die gesamte Integration, erleichtert das Debugging.
 LOGGER: Logger = getLogger(__package__)
 
-DOMAIN = "neoom_connect"
-NAME = "neoom Connect"
+# Der eindeutige Bezeichner (Domain) der Integration in Home Assistant.
+DOMAIN: str = "neoom_connect"
 
-# Konfigurations-Schlüssel (werden in der config_flow.py und __init__.py verwendet)
-CONF_SITE_ID = "site_id"
-CONF_BEAAM_IP = "beaam_ip"
-CONF_BEAAM_KEY = "beaam_key"
-CONF_CLOUD_TOKEN = "cloud_token"
+# Der Anzeigename der Integration in der Benutzeroberfläche.
+NAME: str = "neoom Connect"
 
-# API Endpunkte
-CLOUD_API_URL = "https://api.ntuity.io/v1"
-LOCAL_API_PORT = 80 # Standard HTTP Port für das BEAAM Gateway
+# --- Konfigurations-Schlüssel ---
+# Diese Schlüssel werden im Config Flow (`config_flow.py`) abgefragt
+# und in den Eintragsdaten (`entry.data` in `__init__.py`) gespeichert.
 
-# Standard Aktualisierungsintervalle
-DEFAULT_SCAN_INTERVAL_CLOUD = 300  # Alle 5 Minuten (Cloud-Daten ändern sich selten)
-DEFAULT_SCAN_INTERVAL_LOCAL = 15   # Alle 15 Sekunden (für Live-Werte vom Gateway)
+# Die eindeutige ID des Standorts (Site) in der Ntuity Cloud.
+CONF_SITE_ID: str = "site_id"
+
+# Das Bearer-Token für die Authentifizierung an der Ntuity Cloud API.
+CONF_CLOUD_TOKEN: str = "cloud_token"
+
+# Die lokale IP-Adresse des BEAAM Gateways in Ihrem Netzwerk.
+CONF_BEAAM_IP: str = "beaam_ip"
+
+# Der API-Schlüssel (Token) für den lokalen Zugriff auf das BEAAM Gateway.
+CONF_BEAAM_KEY: str = "beaam_key"
+
+
+# --- API Endpunkte und Ports ---
+
+# Die Basis-URL für die Ntuity Cloud API (Version 1).
+CLOUD_API_URL: str = "https://api.ntuity.io/v1"
+
+# Der Standard-Port für HTTP-Anfragen an das lokale BEAAM Gateway.
+# Wird aktuell nicht explizit in den URLs verwendet (da 80 implizit ist),
+# dient aber der Dokumentation.
+LOCAL_API_PORT: int = 80
+
+
+# --- Standard Aktualisierungsintervalle ---
+
+# Das Intervall in Sekunden, in dem Daten aus der Cloud abgerufen werden.
+# Da sich diese Daten (wie Preise oder Tarife) selten ändern, genügen 5 Minuten.
+DEFAULT_SCAN_INTERVAL_CLOUD: int = 300  
+
+# Das Intervall in Sekunden, in dem Live-Daten vom lokalen BEAAM Gateway
+# abgerufen werden. Ein kurzer Intervall ist wichtig für Live-Energieflüsse.
+DEFAULT_SCAN_INTERVAL_LOCAL: int = 15
