@@ -1,7 +1,7 @@
-custom_components/neoom_connect/__pycache__/
-custom_components/neoom_connect/__pycache__/config_flow.cpython-312.pyc
-custom_components/neoom_connect/__pycache__/const.cpython-312.pyc
-custom_components/neoom_connect/__pycache__/coordinator.cpython-312.pyc
-custom_components/neoom_connect/__pycache__/number.cpython-312.pyc
-custom_components/neoom_connect/__pycache__/select.cpython-312.pyc
-custom_components/neoom_connect/__pycache__/sensor.cpython-312.pyc
+custom_components/neoom/__pycache__/
+custom_components/neoom/__pycache__/config_flow.cpython-312.pyc
+custom_components/neoom/__pycache__/const.cpython-312.pyc
+custom_components/neoom/__pycache__/coordinator.cpython-312.pyc
+custom_components/neoom/__pycache__/number.cpython-312.pyc
+custom_components/neoom/__pycache__/select.cpython-312.pyc
+custom_components/neoom/__pycache__/sensor.cpython-312.pyc

@@ -1,6 +1,6 @@
-"""Sensor Plattform für neoom Connect.
+"""Sensor Plattform für neoom AI.
 
-Diese Datei definiert die "nur-lesen" Sensoren, die Daten aus der Ntuity Cloud 
+Diese Datei definiert die "nur-lesen" Sensoren, die Daten aus der neoom AI Cloud 
 und dem lokalen BEAAM Gateway in Home Assistant anzeigen.
 """
 
@@ -160,7 +160,7 @@ class NeoomCloudSensor(CoordinatorEntity, SensorEntity):
         """
         return DeviceInfo(
             identifiers={(DOMAIN, self.coordinator.site_id)},
-            name="Ntuity Cloud Site",
+            name="neoom AI Cloud Site",
             manufacturer="neoom",
             model="Cloud API",
         )

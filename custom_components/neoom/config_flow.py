@@ -1,4 +1,4 @@
-"""Konfigurationsfluss (Config Flow) für die neoom Connect Integration.
+"""Konfigurationsfluss (Config Flow) für die neoom AI Integration.
 
 Diese Datei steuert den Einrichtungsassistenten, der dem Benutzer in der
 Home Assistant Oberfläche angezeigt wird, wenn er die Integration hinzufügt.
@@ -22,7 +22,7 @@ from .const import (
 
 
 class NeoomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Behandelt den Konfigurationsfluss für neoom Connect.
+    """Behandelt den Konfigurationsfluss für neoom AI.
     
     Diese Klasse erbt von ConfigFlow und definiert die Schritte, die der User
     durchlaufen muss, um die Integration zu konfigurieren.
@@ -54,7 +54,7 @@ class NeoomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # und speichern sie direkt ab.
             try:
                 LOGGER.info(
-                    "Erstelle neoom Connect Eintrag für Site ID: %s",
+                    "Erstelle neoom AI Eintrag für Site ID: %s",
                     user_input[CONF_SITE_ID],
                 )
                 
@@ -74,7 +74,7 @@ class NeoomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Der Typ 'str' gibt an, dass es sich um einen Text handelt.
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_CLOUD_TOKEN): str,  # Ntuity Bearer Token
+                vol.Required(CONF_CLOUD_TOKEN): str,  # neoom AI Bearer Token
                 vol.Required(CONF_SITE_ID): str,      # UUID der Site
                 vol.Required(CONF_BEAAM_IP): str,     # IP-Adresse des lokalen Gateways
                 vol.Required(CONF_BEAAM_KEY): str,    # API Key für lokales Gateway

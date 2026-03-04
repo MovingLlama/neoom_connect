@@ -1,4 +1,4 @@
-"""Konstanten für die neoom Connect Integration."""
+"""Konstanten für die neoom AI Integration."""
 
 from logging import Logger, getLogger
 
@@ -6,19 +6,19 @@ from logging import Logger, getLogger
 LOGGER: Logger = getLogger(__package__)
 
 # Der eindeutige Bezeichner (Domain) der Integration in Home Assistant.
-DOMAIN: str = "neoom_connect"
+DOMAIN: str = "neoom"
 
 # Der Anzeigename der Integration in der Benutzeroberfläche.
-NAME: str = "neoom Connect"
+NAME: str = "neoom AI"
 
 # --- Konfigurations-Schlüssel ---
 # Diese Schlüssel werden im Config Flow (`config_flow.py`) abgefragt
 # und in den Eintragsdaten (`entry.data` in `__init__.py`) gespeichert.
 
-# Die eindeutige ID des Standorts (Site) in der Ntuity Cloud.
+# Die eindeutige ID des Standorts (Site) in der neoom AI Cloud.
 CONF_SITE_ID: str = "site_id"
 
-# Das Bearer-Token für die Authentifizierung an der Ntuity Cloud API.
+# Das Bearer-Token für die Authentifizierung an der neoom AI Cloud API.
 CONF_CLOUD_TOKEN: str = "cloud_token"
 
 # Die lokale IP-Adresse des BEAAM Gateways in Ihrem Netzwerk.
@@ -30,7 +30,7 @@ CONF_BEAAM_KEY: str = "beaam_key"
 
 # --- API Endpunkte und Ports ---
 
-# Die Basis-URL für die Ntuity Cloud API (Version 1).
+# Die Basis-URL für die neoom AI Cloud API (Version 1).
 CLOUD_API_URL: str = "https://api.ntuity.io/v1"
 
 # Der Standard-Port für HTTP-Anfragen an das lokale BEAAM Gateway.

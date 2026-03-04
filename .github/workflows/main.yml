@@ -50,21 +50,21 @@ jobs:
 
       - name: Update manifest.json (Temporary for Zip)
         run: |
-          jq --arg ver "${{ env.CLEAN_VERSION }}" '.version = $ver' custom_components/neoom_connect/manifest.json > manifest.tmp && mv manifest.tmp custom_components/neoom_connect/manifest.json
+          jq --arg ver "${{ env.CLEAN_VERSION }}" '.version = $ver' custom_components/neoom/manifest.json > manifest.tmp && mv manifest.tmp custom_components/neoom/manifest.json
           
           echo "Manifest Version temporär auf ${{ env.CLEAN_VERSION }} gesetzt."
 
       - name: Zip component directory
         run: |
-          cd custom_components/neoom_connect
-          zip -r ../../neoom_connect.zip .
+          cd custom_components/neoom
+          zip -r ../../neoom.zip .
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.VERSION }}
           name: Release ${{ env.VERSION }}
-          files: neoom_connect.zip
+          files: neoom.zip
           generate_release_notes: true
           draft: false
           prerelease: false

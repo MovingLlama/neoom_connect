@@ -1,4 +1,4 @@
-"""Select Plattform für neoom Connect.
+"""Select Plattform für neoom AI.
 
 Diese Datei definiert Dropdown-Menüs (Select-Entitäten),
 mit denen vordefinierte Text-Werte (z.B. Betriebsmodi) an das 

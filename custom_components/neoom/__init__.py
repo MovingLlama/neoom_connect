@@ -1,8 +1,8 @@
-"""Die neoom Connect Integration.
+"""Die neoom AI Integration.
 
 Diese Integration verbindet Home Assistant mit den Systemen von neoom.
 Sie stellt eine hybride Verbindung her:
-1. Eine Cloud-Verbindung zur Ntuity API für z.B. Tarifdaten (selten aktualisiert).
+1. Eine Cloud-Verbindung zur neoom AI API für z.B. Tarifdaten (selten aktualisiert).
 2. Eine lokale Netzwerkverbindung zum BEAAM Gateway für Live-Energiedaten (oft aktualisiert).
 """
 
@@ -30,7 +30,7 @@ PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.NUMBER, Platform.SELECT]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Richtet eine neoom Connect Instanz basierend auf einem Konfigurationseintrag ein.
+    """Richtet eine neoom AI Instanz basierend auf einem Konfigurationseintrag ein.
 
     Diese Funktion wird aufgerufen, wenn der Benutzer die Integration über die UI
     hinzufügt (Config Flow abgeschlossen) oder wenn Home Assistant startet und
@@ -44,10 +44,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         True, wenn die Einrichtung erfolgreich war, sonst False.
     """
 
-    LOGGER.debug("Starte das Setup für den neoom Connect Eintrag: %s", entry.entry_id)
+    LOGGER.debug("Starte das Setup für den neoom AI Eintrag: %s", entry.entry_id)
 
     # 1. Cloud Coordinator instanziieren
-    # Der Cloud-Coordinator holt Daten von der Ntuity API.
+    # Der Cloud-Coordinator holt Daten von der neoom AI API.
     cloud_coordinator = NeoomCloudCoordinator(
         hass,
         token=entry.data[CONF_CLOUD_TOKEN],
@@ -109,7 +109,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # asynchron für diesen Eintrag einzurichten.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    LOGGER.info("neoom Connect Einrichtung erfolgreich abgeschlossen.")
+    LOGGER.info("neoom AI Einrichtung erfolgreich abgeschlossen.")
     return True
 
 
@@ -136,6 +136,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await data["cloud"].close()
         await data["local"].close()
         
-        LOGGER.info("neoom Connect Eintrag %s erfolgreich entladen.", entry.entry_id)
+        LOGGER.info("neoom AI Eintrag %s erfolgreich entladen.", entry.entry_id)
 
     return unload_ok

@@ -2,10 +2,10 @@
   "config": {
     "step": {
       "user": {
-        "title": "neoom Connect Setup",
-        "description": "Bitte gib deine Ntuity und BEAAM Daten ein.",
+        "title": "neoom AI Setup",
+        "description": "Bitte gib deine neoom AI und BEAAM Daten ein.",
         "data": {
-          "cloud_token": "Ntuity Bearer Token",
+          "cloud_token": "neoom AI Bearer Token",
           "site_id": "Site ID (UUID)",
           "beaam_ip": "Lokale IP des BEAAM (z.B. 192.168.1.50)",
           "beaam_key": "BEAAM API Key"

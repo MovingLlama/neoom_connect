@@ -1,4 +1,4 @@
-"""Number Plattform für neoom Connect.
+"""Number Plattform für neoom AI.
 
 Diese Datei definiert Entitäten zur Zahleneingabe (Slider oder Eingabefelder),
 mit denen Werte an das lokale BEAAM Gateway gesendet werden können

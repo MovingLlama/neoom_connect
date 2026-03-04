@@ -1,7 +1,7 @@
-"""Daten-Aktualisierungs-Koordinatoren (DataUpdateCoordinators) für neoom Connect.
+"""Daten-Aktualisierungs-Koordinatoren (DataUpdateCoordinators) für neoom AI.
 
 Diese Koordinatoren sind dafür verantwortlich, in regelmäßigen Abständen Daten
-von den jeweiligen APIs (Ntuity Cloud und lokales BEAAM Gateway) abzurufen 
+von den jeweiligen APIs (neoom AI Cloud und lokales BEAAM Gateway) abzurufen 
 und diese dann den Sensoren und anderen Entitäten in Home Assistant zur Verfügung zu stellen.
 Das verhindert, dass jede Entität eigene Netzwerk-Anfragen stellt, was die Systeme überlasten würde.
 """
@@ -30,7 +30,7 @@ from .const import (
 
 
 class NeoomCloudCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
-    """Koordinator für den Abruf von Daten aus der Ntuity Cloud."""
+    """Koordinator für den Abruf von Daten aus der neoom AI Cloud."""
 
     def __init__(self, hass: HomeAssistant, token: str, site_id: str) -> None:
         """Initialisiert den Cloud-Koordinator.
@@ -53,7 +53,7 @@ class NeoomCloudCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
         self.session = aiohttp.ClientSession()
 
     async def _async_update_data(self) -> Dict[str, Any]:
-        """Ruft die neuesten Daten von der Ntuity Cloud ab.
+        """Ruft die neuesten Daten von der neoom AI Cloud ab.
 
         Wird vom DataUpdateCoordinator in den konfigurierten Intervallen (DEFAULT_SCAN_INTERVAL_CLOUD) aufgerufen.
 
@@ -76,7 +76,7 @@ class NeoomCloudCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                     if resp.status == 401:
                         # Ein 401-Fehler deutet auf ein ungültiges Token hin.
                         # Wir werfen ConfigEntryAuthFailed, damit HA den Benutzer zur erneuten Anmeldung auffordert.
-                        raise ConfigEntryAuthFailed("Ntuity Cloud Token ist ungültig oder abgelaufen.")
+                        raise ConfigEntryAuthFailed("neoom AI Cloud Token ist ungültig oder abgelaufen.")
                     
                     # Bei anderen HTTP-Fehlern (4xx, 5xx) wirft raise_for_status eine Exception.
                     resp.raise_for_status()
@@ -98,10 +98,10 @@ class NeoomCloudCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
         except aiohttp.ClientError as err:
             # Fängt alle Fehler ab, die während der HTTP-Kommunikation auftreten
             # (z.B. Verbindungsabbrüche, DNS-Probleme).
-            raise UpdateFailed(f"Fehler bei der Kommunikation mit der Ntuity API: {err}") from err
+            raise UpdateFailed(f"Fehler bei der Kommunikation mit der neoom AI API: {err}") from err
         except asyncio.TimeoutError as err:
             # Fängt Überschreitungen des async_timeout ab
-            raise UpdateFailed("Timeout bei der Verbindung zur Ntuity API.") from err
+            raise UpdateFailed("Timeout bei der Verbindung zur neoom AI API.") from err
 
     async def close(self) -> None:
         """Schließt die aufrechterhaltene HTTP-Session.
