@@ -85,6 +85,8 @@ class NeoomCloudCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                 # 2. Den letzten Energiefluss abrufen (aktuelle Übersichtswerte wie Gesamtverbrauch etc.)
                 url_flow = f"{CLOUD_API_URL}/sites/{self.site_id}/energy-flow/latest"
                 async with self.session.get(url_flow, headers=headers) as resp:
+                    if resp.status == 401:
+                        raise ConfigEntryAuthFailed("neoom AI Cloud Token ist ungültig oder abgelaufen.")
                     resp.raise_for_status()
                     flow_data: Dict[str, Any] = await resp.json()
 
@@ -95,6 +97,8 @@ class NeoomCloudCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                 "flow": flow_data
             }
 
+        except ConfigEntryAuthFailed:
+            raise
         except aiohttp.ClientError as err:
             # Fängt alle Fehler ab, die während der HTTP-Kommunikation auftreten
             # (z.B. Verbindungsabbrüche, DNS-Probleme).
@@ -176,6 +180,8 @@ class NeoomLocalCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                     
                     self.beaam_config = config
                     LOGGER.debug("BEAAM Konfiguration (Gerätestruktur) erfolgreich geladen.")
+        except ConfigEntryAuthFailed:
+            raise
         except Exception as err:
             # Wird an die aufrufende Methode (_async_update_data) weitergereicht.
             raise UpdateFailed(f"Konnte BEAAM Konfiguration nicht laden: {err}") from err
@@ -223,17 +229,26 @@ class NeoomLocalCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                         resp.raise_for_status()
                         site_data: Dict[str, Any] = await resp.json()
                         
-                        if "energyFlow" in site_data and "states" in site_data["energyFlow"]:
-                            for item in site_data["energyFlow"]["states"]:
-                                state_map[item["dataPointId"]] = item
-                                state_map[f"energyFlow_{item['key']}"] = item
+                        if isinstance(site_data, dict) and "energyFlow" in site_data:
+                            energy_flow = site_data.get("energyFlow")
+                            if isinstance(energy_flow, dict) and "states" in energy_flow:
+                                states_list = energy_flow.get("states")
+                                if isinstance(states_list, list):
+                                    for item in states_list:
+                                        if isinstance(item, dict):
+                                            dp_id = item.get("dataPointId")
+                                            key = item.get("key")
+                                            if dp_id is not None:
+                                                state_map[str(dp_id)] = item
+                                            if key is not None:
+                                                state_map[f"energyFlow_{key}"] = item
                 except ConfigEntryAuthFailed:
                     raise
                 except Exception as err:
                     LOGGER.warning("Fehler beim Abrufen des globalen Site-Status (site/state): %s. Versuche dennoch, den Status der einzelnen Geräte abzurufen.", err)
 
                 # 2. Detail-Status und Einstellungen für einzelne Geräte ("Things") abrufen
-                if self.beaam_config and "things" in self.beaam_config:
+                if self.beaam_config and "things" in self.beaam_config and isinstance(self.beaam_config["things"], dict):
                     tasks_states: List[asyncio.Task[Optional[Dict[str, Any]]]] = []
                     tasks_settings: List[asyncio.Task[Optional[Dict[str, Any]]]] = []
                     thing_ids = list(self.beaam_config["things"].keys())
@@ -256,15 +271,26 @@ class NeoomLocalCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                         
                         for thing_id, res in zip(thing_ids, results_states):
                             if isinstance(res, dict) and "states" in res:
-                                for item in res["states"]:
-                                    state_map[item["dataPointId"]] = item
-                                    state_map[f"{thing_id}_{item['key']}"] = item
+                                states_list = res.get("states")
+                                if isinstance(states_list, list):
+                                    for item in states_list:
+                                        if isinstance(item, dict):
+                                            dp_id = item.get("dataPointId")
+                                            key = item.get("key")
+                                            if dp_id is not None:
+                                                state_map[str(dp_id)] = item
+                                            if key is not None:
+                                                state_map[f"{thing_id}_{key}"] = item
                         
                         for thing_id, res in zip(thing_ids, results_settings):
                             if isinstance(res, dict) and "settings" in res:
-                                settings_map[thing_id] = {
-                                    s["key"]: s["value"] for s in res["settings"] if s.get("key")
-                                }
+                                settings_list = res.get("settings")
+                                if isinstance(settings_list, list):
+                                    settings_map[thing_id] = {
+                                        s["key"]: s["value"]
+                                        for s in settings_list
+                                        if isinstance(s, dict) and s.get("key") is not None and "value" in s
+                                    }
 
                 return {
                     "config": self.beaam_config,
@@ -272,6 +298,8 @@ class NeoomLocalCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                     "settings": settings_map
                 }
 
+        except ConfigEntryAuthFailed:
+            raise
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Kommunikationsfehler (Netzwerk/HTTP) mit BEAAM Gateway: {err}") from err
         except TimeoutError as err:

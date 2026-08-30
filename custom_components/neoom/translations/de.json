@@ -16,11 +16,24 @@
         "data": {
           "site_id": "Standort (Site)"
         }
+      },
+      "reauth_confirm": {
+        "title": "neoom AI erneut authentifizieren",
+        "description": "Bitte gib deine aktualisierten Zugangsdaten für neoom AI und BEAAM ein.",
+        "data": {
+          "cloud_token": "neoom AI Bearer Token",
+          "beaam_ip": "Lokale IP des BEAAM (z.B. 192.168.1.50)",
+          "beaam_key": "BEAAM API Key"
+        }
       }
     },
     "error": {
       "cannot_connect": "Verbindung fehlgeschlagen",
       "invalid_auth": "Ungültige Zugangsdaten"
+    },
+    "abort": {
+      "reauth_successful": "Erneute Authentifizierung war erfolgreich",
+      "already_configured": "Gerät ist bereits konfiguriert"
     }
   },
   "entity": {

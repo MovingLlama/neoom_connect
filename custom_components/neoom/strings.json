@@ -16,11 +16,24 @@
         "data": {
           "site_id": "Site"
         }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate neoom AI",
+        "description": "Please enter your updated neoom AI and BEAAM credentials.",
+        "data": {
+          "cloud_token": "neoom AI Bearer Token",
+          "beaam_ip": "Local IP of BEAAM (e.g. 192.168.1.50)",
+          "beaam_key": "BEAAM API Key"
+        }
       }
     },
     "error": {
       "cannot_connect": "Failed to connect",
       "invalid_auth": "Invalid authentication"
+    },
+    "abort": {
+      "reauth_successful": "Re-authentication was successful",
+      "already_configured": "Device is already configured"
     }
   },
   "entity": {
@@ -57,6 +70,15 @@
           "device_controlled": "Excluded",
           "excess_consumption": "Solar",
           "fast_charging": "Fast"
+        }
+      },
+      "operating_mode_sg_ready": {
+        "name": "SG-Ready Mode",
+        "state": {
+          "1": "Forced OFF (Mode 1)",
+          "2": "Normal (Mode 2)",
+          "3": "Recommended ON (Mode 3)",
+          "4": "Forced ON (Mode 4)"
         }
       },
       "phase_switching_mode": {

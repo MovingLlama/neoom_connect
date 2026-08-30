@@ -32,12 +32,10 @@ All features listed below are fully included in the stable main version (branch 
 
 ---
 
-### 🧪 Beta Version & Release Process
+### 🧪 Releases & Beta Testing
 
-The project is split into two versions (branches) to ensure maximum stability:
-
-* **Stable Version (`main`):** Contains only thoroughly tested features. Releases follow the scheme `1.0.0`, `1.0.1`, etc.
-* **Beta Version (`beta`):** Used to pre-test new features and bug fixes. Beta releases follow the scheme `1.0.5-beta.1`, etc., before being merged into the main branch.
+* **Stable Releases:** Tagged releases following semantic versioning (e.g., `1.0.0`, `1.0.4`).
+* **Beta Pre-Releases:** Used to pre-test new features and bug fixes (e.g., `1.0.5-beta.1`). In HACS, enable **Show beta versions** on the integration to install pre-releases.
 
 ---
 
@@ -156,7 +154,7 @@ logger:
 
 Sie verbindet das Beste aus zwei Welten:
 1. **neoom AI Cloud:** Für Tarifdaten.
-2. **Lokales BEAAM Gateway:** Für Echtzeit-Daten (im Sekundentakt) ohne spürbare Cloud-Verzögerung.
+2. **Lokales BEAAM Gateway:** Für Echtzeit-Daten (Aktualisierung alle 15 Sekunden) ohne spürbare Cloud-Verzögerung.
 
 ---
 
@@ -175,12 +173,10 @@ Alle hier aufgelisteten Funktionen sind vollständig in der stabilen Hauptversio
 
 ---
 
-### 🧪 Beta-Version & Release-Prozess
+### 🧪 Releases & Beta-Tests
 
-Das Projekt ist in zwei Versionen (Branches) unterteilt, um maximale Stabilität zu gewährleisten:
-
-* **Stabile Version (`main`):** Enthält nur gründlich getestete Funktionen. Releases folgen dem Schema `1.0.0`, `1.0.1`, etc.
-* **Beta-Version (`beta`):** Hier werden neue Funktionen und Fehlerbehebungen vorab getestet. Beta-Releases folgen dem Schema `1.0.5-beta.1`, etc., bis sie als stabil in die Hauptversion einfließen.
+* **Stabile Releases:** Offizielle Versionen nach Semantic Versioning (z. B. `1.0.0`, `1.0.4`).
+* **Beta Pre-Releases:** Vorabversionen zum Testen neuer Funktionen und Bugfixes (z. B. `1.0.5-beta.1`). In HACS kann dafür einfach das Häkchen bei **Beta-Versionen anzeigen** aktiviert werden.
 
 ---
 

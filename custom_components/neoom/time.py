@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from homeassistant.components.time import TimeEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -32,29 +32,38 @@ async def async_setup_entry(
 ) -> None:
     """Richtet die Time-Plattform basierend auf dem Konfigurationseintrag ein.
     
-    Erstellt Time-Entitäten für alle erkannten Uhrzeit-Einstellungen der Things.
+    Erstellt Time-Entitäten für alle erkannten Uhrzeit-Einstellungen der Things
+    und überwacht spätere Coordinator-Updates für neu erkannte Entitäten.
     """
     data: Dict[str, Any] = hass.data[DOMAIN][entry.entry_id]
     local_coordinator: NeoomLocalCoordinator = data["local"]
 
-    entities: List[TimeEntity] = []
+    known_time_ids: set[str] = set()
 
-    # Warte, bis der Koordinator Daten geladen hat
-    if not local_coordinator.data:
-        return
+    @callback
+    def _async_check_entities() -> None:
+        """Prüft auf neu verfügbare Einstellungen und legt entsprechende Time-Entitäten an."""
+        if not local_coordinator.data:
+            return
 
-    beaam_config: Dict[str, Any] = local_coordinator.data.get("config", {})
-    settings_map: Dict[str, Dict[str, Any]] = local_coordinator.data.get("settings", {})
+        beaam_config = local_coordinator.data.get("config", {})
+        settings_map = local_coordinator.data.get("settings", {})
 
-    if beaam_config and settings_map:
-        things: Dict[str, Any] = beaam_config.get("things", {})
-        
+        if not beaam_config or not settings_map:
+            return
+
+        things = beaam_config.get("things", {})
+        if not isinstance(things, dict):
+            return
+
+        new_entities: List[TimeEntity] = []
+
         for thing_id, thing_data in things.items():
-            if not thing_data:
+            if not thing_data or not isinstance(thing_data, dict):
                 continue
 
             thing_settings = settings_map.get(thing_id)
-            if not thing_settings:
+            if not thing_settings or not isinstance(thing_settings, dict):
                 continue
 
             for key, val in thing_settings.items():
@@ -63,18 +72,27 @@ async def async_setup_entry(
                 is_time = key in TIME_SETTINGS
                 if not is_time and key.endswith("_TIME") and isinstance(val, str) and ":" in val:
                     is_time = True
-                
-                if is_time:
-                    entities.append(
-                        NeoomSettingTime(
-                            coordinator=local_coordinator,
-                            thing_id=thing_id,
-                            thing_data=thing_data,
-                            setting_key=key,
-                        )
-                    )
 
-    async_add_entities(entities)
+                if is_time:
+                    unique_id = f"{thing_id}_{key}_time"
+                    if unique_id not in known_time_ids:
+                        known_time_ids.add(unique_id)
+                        new_entities.append(
+                            NeoomSettingTime(
+                                coordinator=local_coordinator,
+                                thing_id=thing_id,
+                                thing_data=thing_data,
+                                setting_key=key,
+                            )
+                        )
+
+        if new_entities:
+            async_add_entities(new_entities)
+
+    _async_check_entities()
+    entry.async_on_unload(
+        local_coordinator.async_add_listener(_async_check_entities)
+    )
 
 
 class NeoomSettingTime(CoordinatorEntity, TimeEntity):

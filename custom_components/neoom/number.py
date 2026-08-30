@@ -19,7 +19,7 @@ from homeassistant.const import (
     UnitOfPower,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -41,31 +41,43 @@ async def async_setup_entry(
     """Richtet die Number-Plattform basierend auf dem Konfigurationseintrag ein.
     
     Diese Methode baut Number-Entitäten dynamisch auf, indem sie die BEAAM 
-    Konfiguration nach steuerbaren, numerischen Datenpunkten durchsucht.
+    Konfiguration nach steuerbaren, numerischen Datenpunkten durchsucht und auf spätere Updates reagiert.
     """
     
     data: Dict[str, Any] = hass.data[DOMAIN][entry.entry_id]
     # Number-Entitäten steuern nur das lokale Gateway, daher brauchen wir nur den lokalen Coordinator
     local_coordinator: NeoomLocalCoordinator = data["local"]
 
-    entities: List[NumberEntity] = []
+    known_number_ids: set[str] = set()
 
-    # Hole die statische Konfiguration (enthält alle bekannten Geräte)
-    beaam_config: Dict[str, Any] = (
-        local_coordinator.data.get("config", {}) if local_coordinator.data else {}
-    )
-    
-    if beaam_config:
-        things: Dict[str, Any] = beaam_config.get("things", {})
-        
+    @callback
+    def _async_check_entities() -> None:
+        """Prüft auf neu verfügbare Datenpunkte/Einstellungen und legt entsprechende Number-Entitäten an."""
+        if not local_coordinator.data:
+            return
+
+        # Hole die statische Konfiguration (enthält alle bekannten Geräte)
+        beaam_config = local_coordinator.data.get("config", {})
+        if not beaam_config or not isinstance(beaam_config, dict):
+            return
+
+        things = beaam_config.get("things", {})
+        if not isinstance(things, dict):
+            return
+
+        new_entities: List[NumberEntity] = []
+
+        # 1. Datenpunkte durchsuchen
         for thing_id, thing_data in things.items():
-            if not thing_data:
+            if not thing_data or not isinstance(thing_data, dict):
                 continue
 
             datapoints: Dict[str, Any] = thing_data.get("dataPoints", {})
+            if not isinstance(datapoints, dict):
+                continue
 
             for dp_id, dp_data in datapoints.items():
-                if not dp_data:
+                if not dp_data or not isinstance(dp_data, dict):
                     continue
 
                 # Wir interessieren uns nur für steuerbare ("controllable": true) Zahlen ("NUMBER")
@@ -76,40 +88,42 @@ async def async_setup_entry(
                 # Filtern von unerwünschten Schlüsseln
                 if dtype == "NUMBER" and key not in IGNORE_KEYS:
                     if controllable:
-                        entities.append(
-                            NeoomLocalNumber(
-                                coordinator=local_coordinator, 
-                                thing_id=thing_id, 
-                                thing_data=thing_data, 
-                                dp_id=dp_id, 
-                                dp_data=dp_data
+                        uid = f"{thing_id}_{dp_id}_number"
+                        if uid not in known_number_ids:
+                            known_number_ids.add(uid)
+                            new_entities.append(
+                                NeoomLocalNumber(
+                                    coordinator=local_coordinator, 
+                                    thing_id=thing_id, 
+                                    thing_data=thing_data, 
+                                    dp_id=dp_id, 
+                                    dp_data=dp_data
+                                )
                             )
-                        )
                     else:
                         # Wenn nicht steuerbar, legen wir eine Ingest-Entität an (standardmäßig deaktiviert)
-                        entities.append(
-                            NeoomIngestNumber(
-                                coordinator=local_coordinator, 
-                                thing_id=thing_id, 
-                                thing_data=thing_data, 
-                                dp_id=dp_id, 
-                                dp_data=dp_data
+                        uid = f"{thing_id}_{dp_id}_ingest"
+                        if uid not in known_number_ids:
+                            known_number_ids.add(uid)
+                            new_entities.append(
+                                NeoomIngestNumber(
+                                    coordinator=local_coordinator, 
+                                    thing_id=thing_id, 
+                                    thing_data=thing_data, 
+                                    dp_id=dp_id, 
+                                    dp_data=dp_data
+                                )
                             )
-                        )
-
 
         # 2. Einstellungen (Settings) dynamisch durchsuchen
-        settings_map: Dict[str, Dict[str, Any]] = (
-            local_coordinator.data.get("settings", {}) if local_coordinator.data else {}
-        )
-        
-        if settings_map:
+        settings_map: Dict[str, Dict[str, Any]] = local_coordinator.data.get("settings", {})
+        if settings_map and isinstance(settings_map, dict):
             for thing_id, thing_data in things.items():
-                if not thing_data:
+                if not thing_data or not isinstance(thing_data, dict):
                     continue
 
                 thing_settings = settings_map.get(thing_id)
-                if not thing_settings:
+                if not thing_settings or not isinstance(thing_settings, dict):
                     continue
 
                 for key, val in thing_settings.items():
@@ -124,21 +138,29 @@ async def async_setup_entry(
                             float(val)
                             if ":" not in val and ("." in val or val.isdigit()):
                                 is_num = True
-                        except ValueError:
+                        except (ValueError, TypeError):
                             pass
                     
                     if is_num:
-                        entities.append(
-                            NeoomSettingNumber(
-                                coordinator=local_coordinator,
-                                thing_id=thing_id,
-                                thing_data=thing_data,
-                                setting_key=key,
+                        uid = f"{thing_id}_{key}_number"
+                        if uid not in known_number_ids:
+                            known_number_ids.add(uid)
+                            new_entities.append(
+                                NeoomSettingNumber(
+                                    coordinator=local_coordinator,
+                                    thing_id=thing_id,
+                                    thing_data=thing_data,
+                                    setting_key=key,
+                                )
                             )
-                        )
 
-    # Entitäten in Home Assistant registrieren
-    async_add_entities(entities)
+        if new_entities:
+            async_add_entities(new_entities)
+
+    _async_check_entities()
+    entry.async_on_unload(
+        local_coordinator.async_add_listener(_async_check_entities)
+    )
 
 
 class NeoomLocalNumber(CoordinatorEntity, NumberEntity):
@@ -228,11 +250,14 @@ class NeoomLocalNumber(CoordinatorEntity, NumberEntity):
         if data_point:
             val = data_point.get("value")
             if val is not None:
-                float_val = float(val)
-                # Konvertiere Wh der API in kWh für Home Assistant
-                if self._uom_raw == "Wh":
-                    return float_val / 1000.0
-                return float_val
+                try:
+                    float_val = float(val)
+                    # Konvertiere Wh der API in kWh für Home Assistant
+                    if self._uom_raw == "Wh":
+                        return float_val / 1000.0
+                    return float_val
+                except (ValueError, TypeError):
+                    pass
         return None
 
     async def async_set_native_value(self, value: float) -> None:

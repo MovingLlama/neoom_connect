@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -39,30 +39,42 @@ async def async_setup_entry(
 ) -> None:
     """Richtet die Select-Plattform basierend auf dem Konfigurationseintrag ein.
     
-    Durchsucht die BEAAM Konfiguration nach steuerbaren Text-Datenpunkten,
-    für die wir eine vordefinierte Liste an Optionen kennen.
+    Durchsucht die BEAAM Konfiguration nach steuerbaren Text-Datenpunkten und Einstellungen,
+    und überwacht spätere Coordinator-Updates für neu erkannte Entitäten.
     """
     data: Dict[str, Any] = hass.data[DOMAIN][entry.entry_id]
     local_coordinator: NeoomLocalCoordinator = data["local"]
 
-    entities: List[SelectEntity] = []
+    known_select_ids: set[str] = set()
 
-    # Hole die statische Konfiguration
-    beaam_config: Dict[str, Any] = (
-        local_coordinator.data.get("config", {}) if local_coordinator.data else {}
-    )
-    
-    if beaam_config:
-        things: Dict[str, Any] = beaam_config.get("things", {})
-        
+    @callback
+    def _async_check_entities() -> None:
+        """Prüft auf neu verfügbare Datenpunkte/Einstellungen und legt Select-Entitäten an."""
+        if not local_coordinator.data:
+            return
+
+        # Hole die statische Konfiguration
+        beaam_config = local_coordinator.data.get("config", {})
+        if not beaam_config or not isinstance(beaam_config, dict):
+            return
+
+        things = beaam_config.get("things", {})
+        if not isinstance(things, dict):
+            return
+
+        new_entities: List[SelectEntity] = []
+
+        # 1. Datenpunkte durchsuchen
         for thing_id, thing_data in things.items():
-            if not thing_data:
+            if not thing_data or not isinstance(thing_data, dict):
                 continue
 
             datapoints: Dict[str, Any] = thing_data.get("dataPoints", {})
+            if not isinstance(datapoints, dict):
+                continue
 
             for dp_id, dp_data in datapoints.items():
-                if not dp_data:
+                if not dp_data or not isinstance(dp_data, dict):
                     continue
 
                 # Suche nach Text-Werten (dataType: STRING) in KNOWN_OPTIONS
@@ -72,42 +84,44 @@ async def async_setup_entry(
                 
                 if dtype == "STRING" and key in KNOWN_OPTIONS:
                     if controllable:
-                        entities.append(
-                            NeoomLocalSelect(
-                                coordinator=local_coordinator, 
-                                thing_id=thing_id, 
-                                thing_data=thing_data, 
-                                dp_id=dp_id, 
-                                dp_data=dp_data,
-                                options=KNOWN_OPTIONS[key]
+                        uid = f"{thing_id}_{dp_id}_select"
+                        if uid not in known_select_ids:
+                            known_select_ids.add(uid)
+                            new_entities.append(
+                                NeoomLocalSelect(
+                                    coordinator=local_coordinator, 
+                                    thing_id=thing_id, 
+                                    thing_data=thing_data, 
+                                    dp_id=dp_id, 
+                                    dp_data=dp_data,
+                                    options=KNOWN_OPTIONS[key]
+                                )
                             )
-                        )
                     else:
                         # Wenn nicht steuerbar (z.B. Generic Device), legen wir eine Ingest-Entität an (standardmäßig deaktiviert)
-                        entities.append(
-                            NeoomIngestSelect(
-                                coordinator=local_coordinator, 
-                                thing_id=thing_id, 
-                                thing_data=thing_data, 
-                                dp_id=dp_id, 
-                                dp_data=dp_data,
-                                options=KNOWN_OPTIONS[key]
+                        uid = f"{thing_id}_{dp_id}_ingest_select"
+                        if uid not in known_select_ids:
+                            known_select_ids.add(uid)
+                            new_entities.append(
+                                NeoomIngestSelect(
+                                    coordinator=local_coordinator, 
+                                    thing_id=thing_id, 
+                                    thing_data=thing_data, 
+                                    dp_id=dp_id, 
+                                    dp_data=dp_data,
+                                    options=KNOWN_OPTIONS[key]
+                                )
                             )
-                        )
-
 
         # 2. Einstellungen (Settings) dynamisch durchsuchen
-        settings_map: Dict[str, Dict[str, Any]] = (
-            local_coordinator.data.get("settings", {}) if local_coordinator.data else {}
-        )
-        
-        if settings_map:
+        settings_map: Dict[str, Dict[str, Any]] = local_coordinator.data.get("settings", {})
+        if settings_map and isinstance(settings_map, dict):
             for thing_id, thing_data in things.items():
-                if not thing_data:
+                if not thing_data or not isinstance(thing_data, dict):
                     continue
 
                 thing_settings = settings_map.get(thing_id)
-                if not thing_settings:
+                if not thing_settings or not isinstance(thing_settings, dict):
                     continue
 
                 for key, val in thing_settings.items():
@@ -121,18 +135,27 @@ async def async_setup_entry(
                                 options = ["griid_controlled", "excess_consumption", "fast_charging", "device_controlled"]
                             elif thing_type == "HEAT_PUMP" or thing_type.startswith("HEAT_PUMP"):
                                 options = ["excess_consumption", "device_controlled"]
-                        entities.append(
-                            NeoomSettingSelect(
-                                coordinator=local_coordinator,
-                                thing_id=thing_id,
-                                thing_data=thing_data,
-                                setting_key=key,
-                                options=options,
-                            )
-                        )
 
-    # Entitäten in Home Assistant registrieren
-    async_add_entities(entities)
+                        uid = f"{thing_id}_{key}_select"
+                        if uid not in known_select_ids:
+                            known_select_ids.add(uid)
+                            new_entities.append(
+                                NeoomSettingSelect(
+                                    coordinator=local_coordinator,
+                                    thing_id=thing_id,
+                                    thing_data=thing_data,
+                                    setting_key=key,
+                                    options=options,
+                                )
+                            )
+
+        if new_entities:
+            async_add_entities(new_entities)
+
+    _async_check_entities()
+    entry.async_on_unload(
+        local_coordinator.async_add_listener(_async_check_entities)
+    )
 
 
 class NeoomLocalSelect(CoordinatorEntity, SelectEntity):

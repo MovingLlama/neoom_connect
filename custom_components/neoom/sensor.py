@@ -39,11 +39,6 @@ async def async_setup_entry(
     """Richtet die Sensor-Plattform basierend auf dem Konfigurationseintrag ein.
     
     Diese Methode wird von Home Assistant aufgerufen, um Entitäten zu registrieren.
-
-    Args:
-        hass: Die Home Assistant Instanz.
-        entry: Der Konfigurationseintrag.
-        async_add_entities: Die Methode zum Registrieren der neuen Entitäten.
     """
     
     # Hole die Koordinatoren, die wir in __init__.py gespeichert haben
@@ -87,44 +82,67 @@ async def async_setup_entry(
         )
     )
 
+    async_add_entities(entities)
+
     # --- LOKALE SENSOREN (Dynamisch) ---
     # Da das BEAAM Gateway je nach Standort unterschiedliche Geräte 
     # (Wechselrichter, Speicher, E-Ladestation) angebunden hat,
-    # generieren wir diese Sensoren dynamisch anhand der BEAAM Konfiguration.
-    beaam_config: Dict[str, Any] = (
-        local_coordinator.data.get("config", {}) if local_coordinator.data else {}
-    )
+    # generieren wir diese Sensoren dynamisch anhand der BEAAM Konfiguration
+    # und überwachen spätere Updates.
+    known_sensor_ids: set[str] = set()
 
-    if beaam_config:
-        things: Dict[str, Any] = beaam_config.get("things", {})
+    @callback
+    def _async_check_entities() -> None:
+        """Prüft auf neu verfügbare Datenpunkte und legt Sensor-Entitäten an."""
+        if not local_coordinator.data:
+            return
+
+        beaam_config = local_coordinator.data.get("config", {})
+        if not beaam_config or not isinstance(beaam_config, dict):
+            return
+
+        things = beaam_config.get("things", {})
+        if not isinstance(things, dict):
+            return
+
+        new_entities: List[SensorEntity] = []
 
         for thing_id, thing_data in things.items():
-            if not thing_data:
+            if not thing_data or not isinstance(thing_data, dict):
                 continue
 
-            # Jeder Datenpunkt (DP) eines Geräts (Thing) wird zu einem eigenen Home Assistant Sensor
             datapoints: Dict[str, Any] = thing_data.get("dataPoints", {})
+            if not isinstance(datapoints, dict):
+                continue
 
             for dp_id, dp_data in datapoints.items():
-                if not dp_data:
+                if not dp_data or not isinstance(dp_data, dict):
                     continue
 
                 dtype: str = dp_data.get("dataType", "")
 
                 # Wir erstellen Sensoren für Zahlen (Leistung, Prozente) und Strings (Betriebsmodi)
                 if dtype in ["NUMBER", "STRING"]:
-                    entities.append(
-                        NeoomLocalSensor(
-                            coordinator=local_coordinator,
-                            thing_id=thing_id,
-                            thing_data=thing_data,
-                            dp_id=dp_id,
-                            dp_data=dp_data,
+                    unique_id = f"{thing_id}_{dp_id}"
+                    if unique_id not in known_sensor_ids:
+                        known_sensor_ids.add(unique_id)
+                        new_entities.append(
+                            NeoomLocalSensor(
+                                coordinator=local_coordinator,
+                                thing_id=thing_id,
+                                thing_data=thing_data,
+                                dp_id=dp_id,
+                                dp_data=dp_data,
+                            )
                         )
-                    )
 
-    # Füge alle generierten Sensoren zu Home Assistant hinzu
-    async_add_entities(entities)
+        if new_entities:
+            async_add_entities(new_entities)
+
+    _async_check_entities()
+    entry.async_on_unload(
+        local_coordinator.async_add_listener(_async_check_entities)
+    )
 
 
 class NeoomCloudSensor(CoordinatorEntity, SensorEntity):
@@ -373,15 +391,39 @@ class NeoomLocalSensor(CoordinatorEntity, SensorEntity):
 
     def _map_state_class(self, key: str, unit: str) -> Optional[SensorStateClass]:
         """Bestimmt das Langzeit-Aufzeichnungsverhalten (Statistics) des Sensors in HA."""
-        # Energiemengen (produziert/verbraucht) steigen kontinuierlich an.
-        # Wir schließen Prozentwerte (%) und Leistungswerte (W/kW) explizit aus, um Konflikte
-        # mit Einstellungen wie MIN_SOC_BACKUP_ENERGY zu vermeiden.
-        if ("ENERGY" in key and unit not in ["%", "W", "kW", "MW", "GW"]) or unit in ["Wh", "kWh", "MWh", "GWh"]:
-            return SensorStateClass.TOTAL_INCREASING
-            
         # Wenn es sich um eine Zahl ohne Einheit (None) handelt oder einen Text-Status
         if not unit or unit.lower() in ["none", "null"]:
             return None
-            
-        # Normalfall für Messwerte wie Leistung, Spannung, Temperatur
+
+        # Ausschluss von Nicht-Energiewerten: Leistung, Spannung, Strom, Frequenz, Temperatur, Zeit, Prozent
+        if unit in ["%", "W", "kW", "MW", "GW", "V", "A", "Hz", "C", "K", "°C", "s", "h", UnitOfTemperature.CELSIUS, UnitOfTemperature.KELVIN, UnitOfTime.SECONDS, UnitOfTime.HOURS]:
+            return SensorStateClass.MEASUREMENT
+
+        # Prüfung für Energiewerte (Wh, kWh, MWh, GWh oder "ENERGY" im Schlüssel)
+        if unit in ["Wh", "kWh", "MWh", "GWh"] or "ENERGY" in key:
+            key_upper = key.upper()
+            # Nicht-kumulative Energiewerte (z.B. gespeicherte Batterieenergie, Restkapazität, Limits)
+            # stellen einen aktuellen Messwert dar und dürfen NICHT als TOTAL_INCREASING markiert werden,
+            # da ein Absinken des Wertes sonst als Zähler-Reset interpretiert würde und Statistiken verfälscht.
+            non_cumulative_indicators = [
+                "STORED",
+                "STORAGE",
+                "USABLE",
+                "RESERVE",
+                "CAPACITY",
+                "REMAINING",
+                "CONTENT",
+                "TARGET",
+                "LIMIT",
+                "CURRENT",
+                "LEVEL",
+                "SOC",
+            ]
+            if any(indicator in key_upper for indicator in non_cumulative_indicators):
+                return SensorStateClass.MEASUREMENT
+
+            # Zählerstände / kumulative Energiemengen (z.B. erzeugt, verbraucht, eingespeist)
+            return SensorStateClass.TOTAL_INCREASING
+
+        # Normalfall für sonstige Messwerte
         return SensorStateClass.MEASUREMENT

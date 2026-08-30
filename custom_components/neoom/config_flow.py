@@ -1,9 +1,11 @@
 """Konfigurationsfluss (Config Flow) für die neoom AI Integration.
 
 Diese Datei steuert den Einrichtungsassistenten, der dem Benutzer in der
-Home Assistant Oberfläche angezeigt wird, wenn er die Integration hinzufügt.
+Home Assistant Oberfläche angezeigt wird, wenn er die Integration hinzufügt
+oder reauthentifiziert.
 """
 
+from collections.abc import Mapping
 from typing import Any, Dict, Optional
 
 import voluptuous as vol
@@ -27,7 +29,7 @@ class NeoomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Behandelt den Konfigurationsfluss für neoom AI.
     
     Diese Klasse erbt von ConfigFlow und definiert die Schritte, die der User
-    durchlaufen muss, um die Integration zu konfigurieren.
+    durchlaufen muss, um die Integration zu konfigurieren oder zu reauthentifizieren.
     """
 
     # Version des Konfigurationsschemas. Nützlich für zukünftige Migrationen.
@@ -139,4 +141,77 @@ class NeoomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="site_selection",
             data_schema=data_schema,
             errors=errors
+        )
+
+    async def async_step_reauth(
+        self, entry_data: Mapping[str, Any]
+    ) -> FlowResult:
+        """Behandelt den Start des Re-Authentifizierungs-Flusses bei Authentifizierungsfehlern."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: Optional[Dict[str, Any]] = None
+    ) -> FlowResult:
+        """Behandelt die erneute Eingabe und Überprüfung der Zugangsdaten."""
+        errors: Dict[str, str] = {}
+        reauth_entry = self._get_reauth_entry()
+
+        if user_input is not None:
+            token = user_input[CONF_CLOUD_TOKEN]
+            ip = user_input[CONF_BEAAM_IP]
+            key = user_input[CONF_BEAAM_KEY]
+            site_id = reauth_entry.data.get(CONF_SITE_ID)
+
+            session = async_create_clientsession(self.hass)
+
+            # 1. Cloud Token validieren
+            try:
+                url_site = f"{CLOUD_API_URL}/sites/{site_id}" if site_id else f"{CLOUD_API_URL}/sites"
+                async with session.get(url_site, headers={"Authorization": f"Bearer {token}"}) as resp:
+                    if resp.status == 401:
+                        errors["base"] = "invalid_auth"
+                    else:
+                        resp.raise_for_status()
+            except Exception as e:
+                LOGGER.warning("Reauth Cloud-Prüfung fehlgeschlagen: %s", e)
+                if "base" not in errors:
+                    errors["base"] = "cannot_connect"
+
+            # 2. BEAAM IP und API Key validieren
+            if not errors:
+                try:
+                    url_beaam = f"http://{ip}/api/v1/site/configuration"
+                    async with session.get(url_beaam, headers={"Authorization": f"Bearer {key}"}, timeout=10) as resp:
+                        if resp.status == 401:
+                            errors["base"] = "invalid_auth"
+                        else:
+                            resp.raise_for_status()
+                except Exception as e:
+                    LOGGER.warning("Reauth BEAAM-Prüfung fehlgeschlagen: %s", e)
+                    if "base" not in errors:
+                        errors["base"] = "cannot_connect"
+
+            if not errors:
+                return self.async_update_reload_and_abort(
+                    reauth_entry,
+                    data={
+                        **reauth_entry.data,
+                        CONF_CLOUD_TOKEN: token,
+                        CONF_BEAAM_IP: ip,
+                        CONF_BEAAM_KEY: key,
+                    },
+                )
+
+        data_schema = vol.Schema(
+            {
+                vol.Required(CONF_CLOUD_TOKEN, default=reauth_entry.data.get(CONF_CLOUD_TOKEN, "")): str,
+                vol.Required(CONF_BEAAM_IP, default=reauth_entry.data.get(CONF_BEAAM_IP, "")): str,
+                vol.Required(CONF_BEAAM_KEY, default=reauth_entry.data.get(CONF_BEAAM_KEY, "")): str,
+            }
+        )
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=data_schema,
+            errors=errors,
         )
