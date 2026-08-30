@@ -25,6 +25,15 @@
           "beaam_ip": "Local IP of BEAAM (e.g. 192.168.1.50)",
           "beaam_key": "BEAAM API Key"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure neoom AI",
+        "description": "Update connection details for neoom AI and BEAAM.",
+        "data": {
+          "cloud_token": "neoom AI Bearer Token",
+          "beaam_ip": "Local IP of BEAAM (e.g. 192.168.1.50)",
+          "beaam_key": "BEAAM API Key"
+        }
       }
     },
     "error": {
@@ -33,7 +42,27 @@
     },
     "abort": {
       "reauth_successful": "Re-authentication was successful",
+      "reconfigure_successful": "Re-configuration was successful",
       "already_configured": "Device is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "neoom AI Options",
+        "description": "Configure polling intervals and connection details for neoom AI.",
+        "data": {
+          "scan_interval_local": "Local update interval in seconds (5-300s)",
+          "scan_interval_cloud": "Cloud update interval in seconds (30-3600s)",
+          "beaam_ip": "Local IP of BEAAM",
+          "beaam_key": "BEAAM API Key",
+          "cloud_token": "neoom AI Bearer Token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication"
     }
   },
   "entity": {

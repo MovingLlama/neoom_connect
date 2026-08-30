@@ -22,6 +22,10 @@ from .const import (
     CONF_SITE_ID,
     CONF_BEAAM_IP,
     CONF_BEAAM_KEY,
+    CONF_SCAN_INTERVAL_CLOUD,
+    CONF_SCAN_INTERVAL_LOCAL,
+    DEFAULT_SCAN_INTERVAL_CLOUD,
+    DEFAULT_SCAN_INTERVAL_LOCAL,
     LOGGER,
 )
 from .coordinator import NeoomCloudCoordinator, NeoomLocalCoordinator
@@ -49,20 +53,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     LOGGER.debug("Starte das Setup für den neoom AI Eintrag: %s", entry.entry_id)
 
+    # Lese Zugangsdaten und Optionen aus entry.options (Fallback auf entry.data)
+    cloud_token = entry.options.get(CONF_CLOUD_TOKEN, entry.data.get(CONF_CLOUD_TOKEN, ""))
+    site_id = entry.data.get(CONF_SITE_ID, "")
+    beaam_ip = entry.options.get(CONF_BEAAM_IP, entry.data.get(CONF_BEAAM_IP, ""))
+    beaam_key = entry.options.get(CONF_BEAAM_KEY, entry.data.get(CONF_BEAAM_KEY, ""))
+    scan_interval_cloud = entry.options.get(CONF_SCAN_INTERVAL_CLOUD, DEFAULT_SCAN_INTERVAL_CLOUD)
+    scan_interval_local = entry.options.get(CONF_SCAN_INTERVAL_LOCAL, DEFAULT_SCAN_INTERVAL_LOCAL)
+
     # 1. Cloud Coordinator instanziieren
     # Der Cloud-Coordinator holt Daten von der neoom AI API.
     cloud_coordinator = NeoomCloudCoordinator(
         hass,
-        token=entry.data[CONF_CLOUD_TOKEN],
-        site_id=entry.data[CONF_SITE_ID],
+        token=cloud_token,
+        site_id=site_id,
+        scan_interval=scan_interval_cloud,
     )
 
     # 2. Local Coordinator instanziieren
     # Der Local-Coordinator holt Echtzeit-Daten direkt vom lokalen BEAAM Gateway im Netzwerk.
     local_coordinator = NeoomLocalCoordinator(
         hass,
-        ip=entry.data[CONF_BEAAM_IP],
-        key=entry.data[CONF_BEAAM_KEY],
+        ip=beaam_ip,
+        key=beaam_key,
+        scan_interval=scan_interval_local,
     )
 
     # Initiale Datenabfrage (Refresh) für beide Coordinators anstoßen
@@ -78,7 +92,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "Setze Einrichtung aus: Home Assistant unternimmt automatische Wiederholungsversuche.",
             err,
         )
-        raise ConfigEntryNotReady(f"BEAAM Gateway unter {entry.data[CONF_BEAAM_IP]} nicht erreichbar: {err}") from err
+        raise ConfigEntryNotReady(f"BEAAM Gateway unter {beaam_ip} nicht erreichbar: {err}") from err
 
     # Bereite den Speicherort in hass.data für unsere Domain vor, falls noch nicht geschehen.
     hass.data.setdefault(DOMAIN, {})
@@ -90,6 +104,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "local": local_coordinator,
     }
 
+    # Listener für Optionen-Updates registrieren (z.B. geänderte Intervalle über das Zahnrad-Menü)
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+
     # --- EXPLIZITE GERÄTE-REGISTRIERUNG ---
     # Wir registrieren das BEAAM Gateway vorab im Device Registry von Home Assistant.
     # Dies ist wichtig, da spätere Geräte (z.B. Wechselrichter, Batterie) über das Attribut
@@ -99,11 +116,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     device_registry = dr.async_get(hass)
     device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, "BEAAM Gateway")},  # Eindeutige ID für dieses Gerät.
+        identifiers={(DOMAIN, "BEAAM Gateway"), (DOMAIN, f"beaam_{entry.data.get(CONF_SITE_ID, entry.entry_id)}")},
         manufacturer="neoom",
         name="BEAAM Gateway",
         model="BEAAM Edge Controller",
-        configuration_url=f"http://{entry.data[CONF_BEAAM_IP]}",
+        configuration_url=f"http://{beaam_ip}",
     )
     LOGGER.debug("BEAAM Gateway im Device Registry angelegt oder abgerufen.")
 
@@ -118,14 +135,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         key = call.data.get("key")
         value = call.data.get("value")
         
-        # Sende den Wert an alle konfigurierten BEAAM Gateways in dieser Home Assistant Instanz.
+        # Sende den Wert an das zuständige BEAAM Gateway
+        sent = False
         for entry_id, coordinators in hass.data.get(DOMAIN, {}).items():
             loc_coord = coordinators.get("local")
             if loc_coord:
-                try:
-                    await loc_coord.async_ingest_state(thing_id, key, value)
-                except Exception as err:
-                    LOGGER.error("Fehler beim Senden von State-Ingest für Eintrag %s: %s", entry_id, err)
+                # Prüfe, ob das Thing diesem Gateway bekannt ist, oder sende wenn nur 1 Gateway existiert
+                known_things = (loc_coord.beaam_config or {}).get("things", {})
+                if thing_id in known_things or len(hass.data.get(DOMAIN, {})) == 1:
+                    try:
+                        await loc_coord.async_ingest_state(thing_id, key, value)
+                        sent = True
+                    except Exception as err:
+                        LOGGER.error("Fehler beim Senden von State-Ingest für Eintrag %s: %s", entry_id, err)
+        
+        if not sent:
+            LOGGER.warning("Thing '%s' wurde in keinem konfigurierten BEAAM Gateway gefunden.", thing_id)
 
     if not hass.services.has_service(DOMAIN, "ingest_state"):
         hass.services.async_register(
@@ -173,3 +198,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         LOGGER.info("neoom AI Eintrag %s erfolgreich entladen.", entry.entry_id)
 
     return unload_ok
+
+
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Lädt den Konfigurationseintrag neu, wenn Optionen geändert wurden."""
+    await hass.config_entries.async_reload(entry.entry_id)
+

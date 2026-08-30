@@ -32,20 +32,27 @@ from .const import (
 class NeoomCloudCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
     """Koordinator für den Abruf von Daten aus der neoom AI Cloud."""
 
-    def __init__(self, hass: HomeAssistant, token: str, site_id: str) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        token: str,
+        site_id: str,
+        scan_interval: int = DEFAULT_SCAN_INTERVAL_CLOUD,
+    ) -> None:
         """Initialisiert den Cloud-Koordinator.
 
         Args:
             hass: Die Home Assistant Instanz.
             token: Das Authentifizierungs-Token (Bearer Token) für die Cloud.
             site_id: Die eindeutige ID des Standorts (Site).
+            scan_interval: Aktualisierungsintervall in Sekunden.
         """
         super().__init__(
             hass,
             LOGGER,
             name=f"{DOMAIN}_cloud",
             # Aktualisierungsintervall für Cloud-Daten (seltenere Änderungen wie Tarife)
-            update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL_CLOUD),
+            update_interval=timedelta(seconds=scan_interval),
         )
         self.token = token
         self.site_id = site_id
@@ -115,20 +122,27 @@ class NeoomCloudCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
 class NeoomLocalCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
     """Koordinator für den Abruf von lokalen Live-Daten vom BEAAM Gateway."""
 
-    def __init__(self, hass: HomeAssistant, ip: str, key: str) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        ip: str,
+        key: str,
+        scan_interval: int = DEFAULT_SCAN_INTERVAL_LOCAL,
+    ) -> None:
         """Initialisiert den lokalen Koordinator.
 
         Args:
             hass: Die Home Assistant Instanz.
             ip: Die IP-Adresse des lokalen BEAAM Gateways.
             key: Der Local-API-Key für die Authentifizierung.
+            scan_interval: Aktualisierungsintervall in Sekunden.
         """
         super().__init__(
             hass,
             LOGGER,
             name=f"{DOMAIN}_local",
             # Häufigeres Update-Intervall für echtzeitnahe Energiedaten.
-            update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL_LOCAL),
+            update_interval=timedelta(seconds=scan_interval),
         )
         self.ip = ip
         self.key = key
@@ -176,7 +190,7 @@ class NeoomLocalCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                                         "unitOfMeasure": "None",
                                         "controllable": True
                                     }
-                                    LOGGER.warning("Injected virtual OPERATING_MODE_SG_READY for HEAT_PUMP: %s", thing_id)
+                                    LOGGER.debug("Injected virtual OPERATING_MODE_SG_READY for HEAT_PUMP: %s", thing_id)
                     
                     self.beaam_config = config
                     LOGGER.debug("BEAAM Konfiguration (Gerätestruktur) erfolgreich geladen.")
@@ -249,25 +263,14 @@ class NeoomLocalCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
 
                 # 2. Detail-Status und Einstellungen für einzelne Geräte ("Things") abrufen
                 if self.beaam_config and "things" in self.beaam_config and isinstance(self.beaam_config["things"], dict):
-                    tasks_states: List[asyncio.Task[Optional[Dict[str, Any]]]] = []
-                    tasks_settings: List[asyncio.Task[Optional[Dict[str, Any]]]] = []
                     thing_ids = list(self.beaam_config["things"].keys())
                     
-                    for thing_id in thing_ids:
-                        tasks_states.append(
-                            asyncio.create_task(
-                                self._fetch_thing_state(thing_id, headers)
-                            )
-                        )
-                        tasks_settings.append(
-                            asyncio.create_task(
-                                self._fetch_thing_settings(thing_id, headers)
-                            )
-                        )
-                    
                     if thing_ids:
-                        results_states = await asyncio.gather(*tasks_states, return_exceptions=True)
-                        results_settings = await asyncio.gather(*tasks_settings, return_exceptions=True)
+                        coros_states = [self._fetch_thing_state(tid, headers) for tid in thing_ids]
+                        coros_settings = [self._fetch_thing_settings(tid, headers) for tid in thing_ids]
+
+                        results_states = await asyncio.gather(*coros_states, return_exceptions=True)
+                        results_settings = await asyncio.gather(*coros_settings, return_exceptions=True)
                         
                         for thing_id, res in zip(thing_ids, results_states):
                             if isinstance(res, dict) and "states" in res:

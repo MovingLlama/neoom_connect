@@ -166,6 +166,8 @@ async def async_setup_entry(
 class NeoomLocalNumber(CoordinatorEntity, NumberEntity):
     """Repräsentation eines steuerbaren numerischen Werts (Number Entity)."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: NeoomLocalCoordinator,
@@ -186,7 +188,7 @@ class NeoomLocalNumber(CoordinatorEntity, NumberEntity):
         self._friendly_thing_name = get_friendly_thing_name(beaam_config, thing_id, self._thing_type)
         friendly_dp_name = self._key.replace("_", " ").title()
         
-        self._attr_name = f"{self._friendly_thing_name} {friendly_dp_name}"
+        self._attr_name = friendly_dp_name
         self._attr_unique_id = f"{thing_id}_{dp_id}_number"
 
         # Setze Einheiten, Device Class und Limits basierend auf der Einheit
@@ -254,7 +256,7 @@ class NeoomLocalNumber(CoordinatorEntity, NumberEntity):
                     float_val = float(val)
                     # Konvertiere Wh der API in kWh für Home Assistant
                     if self._uom_raw == "Wh":
-                        return float_val / 1000.0
+                        return round(float_val / 1000.0, 3)
                     return float_val
                 except (ValueError, TypeError):
                     pass
@@ -268,7 +270,7 @@ class NeoomLocalNumber(CoordinatorEntity, NumberEntity):
         api_value = value
         # Konvertiere die kWh aus HA zurück in Wh für die API
         if self._uom_raw == "Wh":
-            api_value = value * 1000.0
+            api_value = int(round(value * 1000.0))
             
         LOGGER.info("Setze %s auf %s", self._key, api_value)
         await self.coordinator.async_send_command(self._thing_id, self._key, api_value)
@@ -292,6 +294,7 @@ class NeoomIngestNumber(NeoomLocalNumber):
     """
 
     _attr_entity_registry_enabled_default = False
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -306,9 +309,8 @@ class NeoomIngestNumber(NeoomLocalNumber):
         
         # Ändere die eindeutige ID, damit sie nicht mit dem normalen Sensor kollidiert
         self._attr_unique_id = f"{thing_id}_{dp_id}_ingest"
-        
-        # Markiere den Namen als (Ingest), um ihn in der UI von normalen Werten zu unterscheiden
-        self._attr_name = f"{self._attr_name} (Ingest)"
+        friendly_dp_name = self._key.replace("_", " ").title()
+        self._attr_name = f"{friendly_dp_name} (Ingest)"
 
     async def async_set_native_value(self, value: float) -> None:
         """Wird aufgerufen, wenn der Benutzer einen neuen Wert eingibt.
@@ -318,7 +320,7 @@ class NeoomIngestNumber(NeoomLocalNumber):
         api_value = value
         # Konvertiere die kWh aus HA zurück in Wh für die API
         if self._uom_raw == "Wh":
-            api_value = value * 1000.0
+            api_value = int(round(value * 1000.0))
             
         LOGGER.info("Sende State Ingest für %s auf %s", self._key, api_value)
         await self.coordinator.async_ingest_state(self._thing_id, self._key, api_value)
@@ -326,6 +328,8 @@ class NeoomIngestNumber(NeoomLocalNumber):
 
 class NeoomSettingNumber(CoordinatorEntity, NumberEntity):
     """Repräsentation einer Einstellungs-Zahleneingabe (Slider oder Box für Settings)."""
+
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -348,7 +352,7 @@ class NeoomSettingNumber(CoordinatorEntity, NumberEntity):
         else:
             friendly_dp_name = setting_key.replace("_", " ").title()
         
-        self._attr_name = f"{self._friendly_thing_name} {friendly_dp_name}"
+        self._attr_name = friendly_dp_name
         self._attr_unique_id = f"{thing_id}_{setting_key}_number"
         
         # Spezifische Konfiguration für bekannte nummerische Einstellungen
@@ -380,7 +384,7 @@ class NeoomSettingNumber(CoordinatorEntity, NumberEntity):
             try:
                 float_val = float(val)
                 if "ENERGY" in self._setting_key:
-                    return float_val / 1000.0
+                    return round(float_val / 1000.0, 3)
                 return float_val
             except ValueError:
                 pass
@@ -390,11 +394,10 @@ class NeoomSettingNumber(CoordinatorEntity, NumberEntity):
         """Wird aufgerufen, wenn der Benutzer einen neuen Wert in der HA-Oberfläche eingibt."""
         api_value = value
         if "ENERGY" in self._setting_key:
-            api_value = value * 1000.0
+            api_value = int(round(value * 1000.0))
             
         LOGGER.info("Setze Einstellung %s am Gerät %s auf %s", self._setting_key, self._thing_id, api_value)
         # Sende den neuen Einstellwert an das BEAAM Gateway.
-        # Die settings API akzeptiert oneOf string/number/boolean. Senden wir es als float/int.
         await self.coordinator.async_send_setting(self._thing_id, self._setting_key, api_value)
 
     @property
@@ -407,3 +410,4 @@ class NeoomSettingNumber(CoordinatorEntity, NumberEntity):
             model=self._thing_type,
             via_device=(DOMAIN, "BEAAM Gateway"),
         )
+

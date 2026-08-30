@@ -39,7 +39,11 @@ CLOUD_API_URL: str = "https://api.ntuity.io/v1"
 LOCAL_API_PORT: int = 80
 
 
-# --- Standard Aktualisierungsintervalle ---
+# --- Standard Aktualisierungsintervalle & Optionen ---
+
+# Option-Schlüssel für die Aktualisierungsintervalle
+CONF_SCAN_INTERVAL_CLOUD: str = "scan_interval_cloud"
+CONF_SCAN_INTERVAL_LOCAL: str = "scan_interval_local"
 
 # Das Intervall in Sekunden, in dem Daten aus der Cloud abgerufen werden.
 # Da sich diese Daten (wie Preise oder Tarife) selten ändern, genügen 5 Minuten.
@@ -48,3 +52,4 @@ DEFAULT_SCAN_INTERVAL_CLOUD: int = 300
 # Das Intervall in Sekunden, in dem Live-Daten vom lokalen BEAAM Gateway
 # abgerufen werden. Ein kurzer Intervall ist wichtig für Live-Energieflüsse.
 DEFAULT_SCAN_INTERVAL_LOCAL: int = 15
+

@@ -126,7 +126,7 @@ async def async_setup_entry(
 
                 for key, val in thing_settings.items():
                     if key in KNOWN_SETTINGS_OPTIONS:
-                        thing_type = thing_data.get("type", "")
+                        thing_type = thing_data.get("type") or ""
                         options = KNOWN_SETTINGS_OPTIONS[key]
                         if key == "OPERATING_MODE_EMS":
                             if thing_type == "BATTERY":
@@ -161,6 +161,8 @@ async def async_setup_entry(
 class NeoomLocalSelect(CoordinatorEntity, SelectEntity):
     """Repräsentation einer Auswahl-Entität (Dropdown-Menü)."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: NeoomLocalCoordinator,
@@ -184,7 +186,7 @@ class NeoomLocalSelect(CoordinatorEntity, SelectEntity):
         self._friendly_thing_name = get_friendly_thing_name(beaam_config, thing_id, self._thing_type)
         friendly_dp_name = self._key.replace("_", " ").title()
         
-        self._attr_name = f"{self._friendly_thing_name} {friendly_dp_name}"
+        self._attr_name = friendly_dp_name
         self._attr_unique_id = f"{thing_id}_{dp_id}_select"
         self._attr_translation_key = self._key.lower()
         self._attr_icon = "mdi:form-select"
@@ -202,7 +204,6 @@ class NeoomLocalSelect(CoordinatorEntity, SelectEntity):
             val = data_point.get("value")
             
             # Überprüfe, ob der Empfangene Wert in unserer Optionen-Liste ist.
-            # Aber auch wenn nicht, geben wir ihn zurück, um Inkonsistenzen zu signalisieren.
             if val is not None:
                 val_str = str(val).lower()
                 
@@ -252,6 +253,7 @@ class NeoomIngestSelect(NeoomLocalSelect):
     """
 
     _attr_entity_registry_enabled_default = False
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -265,7 +267,8 @@ class NeoomIngestSelect(NeoomLocalSelect):
         """Initialisiert die Ingest-Select-Entität."""
         super().__init__(coordinator, thing_id, thing_data, dp_id, dp_data, options)
         self._attr_unique_id = f"{thing_id}_{dp_id}_ingest_select"
-        self._attr_name = f"{self._attr_name} (Ingest)"
+        friendly_dp_name = self._key.replace("_", " ").title()
+        self._attr_name = f"{friendly_dp_name} (Ingest)"
 
     async def async_select_option(self, option: str) -> None:
         """Wird aufgerufen, wenn der Benutzer einen Wert im Dropdown wählt.

@@ -211,6 +211,8 @@ class NeoomCloudSensor(CoordinatorEntity, SensorEntity):
 class NeoomLocalSensor(CoordinatorEntity, SensorEntity):
     """Repräsentation eines lokalen BEAAM Sensors (z.B. Leistung, Temperatur)."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: NeoomLocalCoordinator,
@@ -232,7 +234,7 @@ class NeoomLocalSensor(CoordinatorEntity, SensorEntity):
         self._friendly_thing_name = get_friendly_thing_name(beaam_config, thing_id, self._thing_type)
         friendly_dp_name = self._key.replace("_", " ").title()
         
-        self._attr_name = f"{self._friendly_thing_name} {friendly_dp_name}"
+        self._attr_name = friendly_dp_name
         self._attr_unique_id = f"{thing_id}_{dp_id}"
 
         # Weise HA-spezifische Device Classes (Typ des Sensors, z.B. Leistung) 
