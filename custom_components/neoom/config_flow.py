@@ -57,7 +57,7 @@ class NeoomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> config_entries.OptionsFlow:
         """Aktiviert das Zahnrad (Optionen-Menü) in der Home Assistant UI."""
-        return NeoomOptionsFlowHandler(config_entry)
+        return NeoomOptionsFlowHandler()
 
     async def async_step_user(
         self, user_input: Optional[Dict[str, Any]] = None
@@ -327,9 +327,11 @@ class NeoomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class NeoomOptionsFlowHandler(config_entries.OptionsFlow):
     """Behandelt das Optionen-Menü (Zahnrad / 'Konfigurieren'-Button) in Home Assistant."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+    def __init__(self, config_entry: Optional[config_entries.ConfigEntry] = None) -> None:
         """Initialisiert den Optionen-Fluss."""
-        self.config_entry = config_entry
+        # Hinweis: self.config_entry ist eine schreibgeschützte Property der Basisklasse OptionsFlow
+        # und wird von Home Assistant automatisch über die ConfigEntry bereitgestellt.
+        super().__init__()
 
     async def async_step_init(
         self, user_input: Optional[Dict[str, Any]] = None
