@@ -14,7 +14,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     DOMAIN,
@@ -73,7 +73,7 @@ class NeoomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             token = user_input[CONF_CLOUD_TOKEN]
             beaam_ip = user_input[CONF_BEAAM_IP]
             beaam_key = user_input[CONF_BEAAM_KEY]
-            session = async_create_clientsession(self.hass)
+            session = async_get_clientsession(self.hass)
 
             # 1. Cloud API aufrufen und Sites abfragen
             url_cloud = f"{CLOUD_API_URL}/sites"
@@ -196,7 +196,7 @@ class NeoomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             key = user_input[CONF_BEAAM_KEY]
             site_id = reauth_entry.data.get(CONF_SITE_ID)
 
-            session = async_create_clientsession(self.hass)
+            session = async_get_clientsession(self.hass)
 
             # 1. Cloud Token validieren
             try:
@@ -265,7 +265,7 @@ class NeoomConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             key = user_input[CONF_BEAAM_KEY]
             site_id = reconfigure_entry.data.get(CONF_SITE_ID)
 
-            session = async_create_clientsession(self.hass)
+            session = async_get_clientsession(self.hass)
 
             # 1. Cloud Validierung
             try:
@@ -346,7 +346,7 @@ class NeoomOptionsFlowHandler(config_entries.OptionsFlow):
             key = user_input.get(CONF_BEAAM_KEY, "")
             site_id = self.config_entry.data.get(CONF_SITE_ID)
 
-            session = async_create_clientsession(self.hass)
+            session = async_get_clientsession(self.hass)
 
             # Optionale Validierung bei geänderten Zugangsdaten
             if token and (token != self.config_entry.options.get(CONF_CLOUD_TOKEN, self.config_entry.data.get(CONF_CLOUD_TOKEN))):

@@ -158,8 +158,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "ingest_state",
             handle_ingest_state,
             schema=vol.Schema({
-                vol.Required("thing_id"): cv.string,
-                vol.Required("key"): cv.string,
+                vol.Required("thing_id"): cv.matches_regex(r"^[a-zA-Z0-9_-]+$"),
+                vol.Required("key"): cv.matches_regex(r"^[a-zA-Z0-9_-]+$"),
                 vol.Required("value"): vol.Any(cv.string, vol.Coerce(float)),
             })
         )
